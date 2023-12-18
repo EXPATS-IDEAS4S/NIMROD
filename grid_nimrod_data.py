@@ -21,28 +21,28 @@ output_folder = '/home/daniele/Documenti/PhD_Cologne/Case Studies/Germany_Flood_
 if not os.path.exists(output_folder):
     os.makedirs(output_folder)
 
-# Domain boundaries in degrees
-latmax = 62.7000
-latmin = 33.0361
-lonmax = 36.3671
-lonmin = -23.4700
+#TODO coefficient for the geolocalization can be found on the ASCII files
 
+#number of columns and rows
 ncols = 620
 nrows = 700
 
+#origin of the image (top-left point)
 xtlcorner =  -23.404760360717773
 ytlcorner = 62.688175201416016
 
-#Polar Stereo
-downward_long = 0 #-32767.0
+#Polar Stereo reference points
+downward_long = 0 #-32767.0 was the value in the ninary file (novalue)
 std_lat = 60.0
 
-cellsize = 5000.0
+#spatial reslution, here we  assume a regular grid!
+cellsize = 5000.0 #y and x grid step are the same
 
+#Set up the Polar Stero projection
 ps_proj = pyproj.Proj(proj='stere', lat_ts=std_lat, lat_0=-90, lon_0=downward_long)
 
 # Convert the origin to projected coordinates
-x_origin, y_origin = ps_proj(xtlcorner, ytlcorner)
+x_origin, y_origin = ps_proj(xtlcorner, ytlcorner) 
 
 # Generate grid coordinates
 x_coords = x_origin + np.arange(ncols) * cellsize
@@ -55,9 +55,6 @@ xx, yy = np.meshgrid(x_coords, y_coords)
 xx_flat = xx.flatten()
 yy_flat = yy.flatten()
 
-# Create the Polar Stereographic projection object
-#ps_proj = pyproj.Proj(proj='stere', lat_ts=standard_latitude, lat_0=-90, lon_0=central_meridian)
-
 # Perform the transformation
 lons, lats = ps_proj(xx_flat, yy_flat, inverse=True)
 
@@ -65,8 +62,6 @@ lons, lats = ps_proj(xx_flat, yy_flat, inverse=True)
 lon_grid = lons.reshape(nrows, ncols)
 lat_grid = lats.reshape(nrows, ncols)
 
-# Convert grid coordinates back to lat/lon
-#lons, lats = ps_proj(x_coords, y_coords, inverse=True)
 
 # Function to read ASCII file and return data
 def read_ascii_file(file_path):
@@ -74,16 +69,12 @@ def read_ascii_file(file_path):
         print(file)
         # Read header lines
         ncols = int(file.readline().split()[1]) #620 -lon
-        #print('ncols',ncols)
         nrows = int(file.readline().split()[1]) #700 -lat
-        #print('nrows', nrows)
         file.readline()  # Skip xllcorner and yllcorner lines
         file.readline()
         cellsize = float(file.readline().split()[1])
-        #print('cellsize',cellsize)
-
         NODATA_value = (file.readline().split()[1])
-        #print('nan',NODATA_value)
+        std_lat = (file.readline().split()[1])
 
         # Read data
         data = np.loadtxt(file)
@@ -103,31 +94,7 @@ def read_ascii_file(file_path):
 def extract_datetime(filename):
     date_str = filename.split('_')[2]
     return datetime.strptime(date_str, '%Y%m%d%H%M')
-"""
-# Convert meter interval to degrees
-# One degree of latitude is approximately 111.32 km
-lat_interval_deg = cellsize / 111320
 
-# Length of a degree of longitude at 60 degrees latitude
-deg_lon_at_60N = 111320 * np.cos(np.radians(60))
-lon_interval_deg = cellsize / deg_lon_at_60N
-
-# Create x y coords arrays
-x_range = np.arange(xtlcorner, xtlcorner + (ncols)*lon_interval_deg, lon_interval_deg)
-#y_range = np.arange(yllcorner, yllcorner + nrows*cellsize, cellsize)
-y_range = np.arange(ytlcorner, ytlcorner - (nrows)*lat_interval_deg, -lat_interval_deg)
-
-#create the x-y grid
-lon_grid, lat_grid = np.meshgrid(x_range, y_range)  # Create a meshgrid for your grid coordinates
-
-#define the start and the end projections
-OSGB36 = pyproj.Proj("EPSG:32662") #EPSG:32662
-WGS84 = pyproj.Proj("EPSG:32662")
-
-# Transform the entire arrays
-#lon_grid, lat_grid = pyproj.transform(OSGB36, WGS84, lon_grid, lat_grid, always_xy=True)
-"""
-#lon_grid, lat_grid = np.meshgrid(lons, lats)
 
 print(lat_grid)
 print(lon_grid)
@@ -162,8 +129,7 @@ if plot:
     cmap.set_under('black', 1.)  # Set zeros to black
 
     # Create a plot with Cartopy
-    plt.figure(figsize=(10, 8))
-    ax = plt.axes(projection=ccrs.PlateCarree())
+    fig, ax = plt.subplots(figsize=(10, 8), subplot_kw={'projection': ccrs.PlateCarree()})
     ax.coastlines()
     ax.add_feature(cfeature.BORDERS, edgecolor='white', linestyle=':')
 
@@ -179,30 +145,32 @@ if plot:
 
     # Save the plot
     plt.show()
-    #plot_filename = f'{output_folder}/rain_rate_plot_{times[timestamp_index].strftime("%Y%m%d%H%M")}.png'
-    #plt.savefig(plot_filename, dpi=300, bbox_inches='tight')
+    plot_filename = f'{output_folder}/rain_rate_plot_{times[timestamp_index].strftime("%Y%m%d%H%M")}.png'
+    fig.savefig(plot_filename, dpi=300, bbox_inches='tight')
     plt.close()
 
-    #print(f"Plot saved as {plot_filename}")
+    print(f"Plot saved as {plot_filename}")
 
 # Extract year, month, and day from one of the times (assuming all same day)
 date_str = times[0].strftime('%Y%m%d')
 
 
-"""
+# Flatten the latitude and longitude grids
+latitudes = lat_grid.flatten()
+longitudes = lon_grid.flatten()
+
 # Create NetCDF file with date in filename
 netcdf_filename = f'{output_folder}/nimrod_rain_data_eu_{date_str}.nc'
 with Dataset(netcdf_filename, 'w', format='NETCDF4') as nc:
     # Create dimensions
     nc.createDimension('time', None)
-    nc.createDimension('lat', len(latitudes))
-    nc.createDimension('lon', len(longitudes))
+    nc.createDimension('grid_point', len(latitudes))
 
     # Create variables
     times_nc = nc.createVariable('time', 'f4', ('time',))
-    latitudes_nc = nc.createVariable('lat', 'f4', ('lat',))
-    longitudes_nc = nc.createVariable('lon', 'f4', ('lon',))
-    rain = nc.createVariable('rain_rate', 'f4', ('time', 'lat', 'lon',), fill_value=np.nan)
+    latitudes_nc = nc.createVariable('latitude', 'f4', ('grid_point',))
+    longitudes_nc = nc.createVariable('longitude', 'f4', ('grid_point',))
+    rain = nc.createVariable('rain_rate', 'f4', ('time', 'grid_point',), fill_value=np.nan)
 
     # Set units and other attributes as necessary
     times_nc.units = 'hours since 2000-01-01 00:00:00'
@@ -214,7 +182,6 @@ with Dataset(netcdf_filename, 'w', format='NETCDF4') as nc:
     times_nc[:] = date2num(times, units=times_nc.units, calendar=times_nc.calendar)
     latitudes_nc[:] = latitudes
     longitudes_nc[:] = longitudes
-    rain[:, :, :] = all_data
+    rain[:, :] = all_data.reshape(len(times), -1)  # Reshape all_data as necessary
 
 print(f"NetCDF file saved as {netcdf_filename}")
-"""
