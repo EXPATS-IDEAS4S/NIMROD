@@ -12,7 +12,7 @@ import pyproj
 plot = True
 
 # Directory containing ASCII files and NC file
-ascii_dir = '/home/daniele/Documenti/PhD_Cologne/Case Studies/Germany_Flood_2021/rain_products/nimrod/20210714_asc/'
+ascii_dir = '/home/daniele/Documenti/PhD_Cologne/Case Studies/Germany_Flood_2021/rain_products/nimrod/20210715_asc/'
 
 # Folder to save the NetCDF file
 output_folder = '/home/daniele/Documenti/PhD_Cologne/Case Studies/Germany_Flood_2021/rain_products/nimrod/'
@@ -115,6 +115,7 @@ for file in ascii_files:
 all_data = np.array(all_data)
 times = np.array(times)
 
+
 #plot one time step for checking
 if plot:
     # Choose a timestamp index (0 for the first timestamp)
@@ -145,43 +146,48 @@ if plot:
 
     # Save the plot
     plt.show()
-    plot_filename = f'{output_folder}/rain_rate_plot_{times[timestamp_index].strftime("%Y%m%d%H%M")}.png'
+    plot_filename = f'{output_folder}/images/rain_rate_plot_{times[timestamp_index].strftime("%Y%m%d%H%M")}.png'
     fig.savefig(plot_filename, dpi=300, bbox_inches='tight')
     plt.close()
 
     print(f"Plot saved as {plot_filename}")
-
-# Extract year, month, and day from one of the times (assuming all same day)
-date_str = times[0].strftime('%Y%m%d')
 
 
 # Flatten the latitude and longitude grids
 latitudes = lat_grid.flatten()
 longitudes = lon_grid.flatten()
 
-# Create NetCDF file with date in filename
-netcdf_filename = f'{output_folder}/nimrod_rain_data_eu_{date_str}.nc'
-with Dataset(netcdf_filename, 'w', format='NETCDF4') as nc:
-    # Create dimensions
-    nc.createDimension('time', None)
-    nc.createDimension('grid_point', len(latitudes))
+# Reshape all_data for convenience
+reshaped_data = all_data.reshape(len(times), -1)
 
-    # Create variables
-    times_nc = nc.createVariable('time', 'f4', ('time',))
-    latitudes_nc = nc.createVariable('latitude', 'f4', ('grid_point',))
-    longitudes_nc = nc.createVariable('longitude', 'f4', ('grid_point',))
-    rain = nc.createVariable('rain_rate', 'f4', ('time', 'grid_point',), fill_value=np.nan)
+for i, time in enumerate(times):
+    # Format the current time into a string
+    date_str = time.strftime('%Y%m%d_%H%M')
 
-    # Set units and other attributes as necessary
-    times_nc.units = 'hours since 2000-01-01 00:00:00'
-    times_nc.calendar = 'gregorian'
-    latitudes_nc.units = 'degrees_north'
-    longitudes_nc.units = 'degrees_east'
+    # Create a unique filename for each time step
+    netcdf_filename = f'{output_folder}/nc_files/nimrod_rain_data_eu_{date_str}.nc'
 
-    # Assign data
-    times_nc[:] = date2num(times, units=times_nc.units, calendar=times_nc.calendar)
-    latitudes_nc[:] = latitudes
-    longitudes_nc[:] = longitudes
-    rain[:, :] = all_data.reshape(len(times), -1)  # Reshape all_data as necessary
+    with Dataset(netcdf_filename, 'w', format='NETCDF4') as nc:
+        # Create dimensions
+        nc.createDimension('time', 1)
+        nc.createDimension('grid_point', len(latitudes))
 
-print(f"NetCDF file saved as {netcdf_filename}")
+        # Create variables
+        times_nc = nc.createVariable('time', 'f4', ('time',))
+        latitudes_nc = nc.createVariable('latitude', 'f4', ('grid_point',))
+        longitudes_nc = nc.createVariable('longitude', 'f4', ('grid_point',))
+        rain = nc.createVariable('rain_rate', 'f4', ('time', 'grid_point',), fill_value=np.nan)
+
+        # Set units and other attributes as necessary
+        times_nc.units = 'hours since 2000-01-01 00:00:00'
+        times_nc.calendar = 'gregorian'
+        latitudes_nc.units = 'degrees_north'
+        longitudes_nc.units = 'degrees_east'
+
+        # Assign data for this time step
+        times_nc[0] = date2num([time], units=times_nc.units, calendar=times_nc.calendar)
+        latitudes_nc[:] = latitudes
+        longitudes_nc[:] = longitudes
+        rain[0, :] = reshaped_data[i]
+
+    print(f"NetCDF file saved as {netcdf_filename}")

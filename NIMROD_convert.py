@@ -155,8 +155,8 @@ def show_radar_image(full_filepath):
 ########  
 
 #directories paths
-fpath = '/home/daniele/Documenti/PhD_Cologne/Case Studies/Germany_Flood_2021/rain_products/nimrod/20210714_dat/'
-save_dir = '/home/daniele/Documenti/PhD_Cologne/Case Studies/Germany_Flood_2021/rain_products/nimrod/20210714_asc/'
+fpath = '/home/daniele/Documenti/PhD_Cologne/Case Studies/Germany_Flood_2021/rain_products/nimrod/20210715_dat/'
+save_dir = '/home/daniele/Documenti/PhD_Cologne/Case Studies/Germany_Flood_2021/rain_products/nimrod/20210715_asc/'
 
 # for multiple files. You do not need to specify a basename if you want to conver ALL files in dir.
 basename = "*composite.dat"
