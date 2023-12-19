@@ -6,18 +6,15 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
-import random
 
 
 # Function to plot data with a custom colormap and Cartopy
-def plot_data(rain_data, lat, lon, title, save):
+def plot_data(rain_data, lat, lon, time, title, save):
     """
     rain_data (M,N), lat (M,N), lon (M,N)
     """
     # Create a custom colormap
     cmap = plt.cm.gist_ncar.copy()
-    #cmap.set_bad('grey', 1.)  # Set NaNs to grey TODO check this
-    #cmap.set_under('black', 1.)  # Set zeros to black TODO check this
 
     # Create a plot with Cartopy
     fig, ax = plt.subplots(figsize=(10, 8), subplot_kw={'projection': ccrs.PlateCarree()})
@@ -31,20 +28,18 @@ def plot_data(rain_data, lat, lon, title, save):
     # Add colorbar with reduced size
     cbar = plt.colorbar(mesh, label='Rain Rate (mm/h)', shrink=0.5)
 
-    plt.title(f'Rain Rate Plot - '+title)
+    plt.title(f'Rain Rate Plot '+str(time)+' - '+title)
     plt.xlabel('Longitude (degrees)')
     plt.ylabel('Latitude (degrees)')
 
     # Save the plot
     if save:
-        plot_filename = '/home/daniele/Documenti/PhD_Cologne/Case Studies/Germany_Flood_2021/rain_products/nimrod/images/rain_rate_'+title+'.png'
+        date_string = time.strftime('%Y-%m-%d %H:%M:%S')
+        plot_filename = '/home/daniele/Documenti/PhD_Cologne/Case Studies/Germany_Flood_2021/rain_products/nimrod/images/rain_rate_'+date_string+'_'+title+'.png'
         fig.savefig(plot_filename, dpi=300, bbox_inches='tight')
         print(f"Plot saved as {plot_filename}")
         plt.close()
-    #else:
-    #    plt.show()
 
-    #plt.close()
 
 # Function to read the lat/lon grid from the MSG file
 def read_msg_lat_lon(msg_file):
@@ -67,7 +62,7 @@ def read_radar_data_with_lat_lon(radar_file):
         # Since there's only one time step per file, we take the first (and only) element
         rain_rate = rain_rate[0, :]
 
-    return time, latitudes, longitudes, rain_rate
+    return time[0], latitudes, longitudes, rain_rate
 
 
 def crop_radar_data(radar_data, radar_lat, radar_lon, lat_min, lat_max, lon_min, lon_max):
@@ -99,11 +94,10 @@ def regrid_data(radar_lat, radar_lon, radar_data, msg_lat_grid, msg_lon_grid):
     radar_points = np.array([radar_lat, radar_lon]).T
 
     # Create a 2D mesh grid for the MSG data
-    #msg_lon_grid, msg_lat_grid = np.meshgrid(msg_lon, msg_lat)
     msg_points = np.array([msg_lat_grid.flatten(), msg_lon_grid.flatten()]).T
 
     # Perform the regridding
-    regridded_data = griddata(radar_points, radar_data, msg_points, method='linear')
+    regridded_data = griddata(radar_points, radar_data, msg_points, method='nearest')
 
     # Reshape the regridded data back to 2D (if necessary)
     regridded_data_reshaped = regridded_data.reshape(msg_lat_grid.shape)
@@ -117,8 +111,6 @@ output_folder = '/home/daniele/Documenti/PhD_Cologne/Case Studies/Germany_Flood_
 
 # Read MSG lat/lon data
 msg_lat, msg_lon = read_msg_lat_lon(msg_file)
-print(len(msg_lat),msg_lat)
-print(len(msg_lon), msg_lon)
 msg_lon_grid, msg_lat_grid = np.meshgrid(msg_lon, msg_lat)
 
 #chech the format of the radar rain data
@@ -134,8 +126,8 @@ above_zero_count = np.count_nonzero(rain_rate > 0)
 print(f"Number of NaN values: {nan_count}")
 print(f"Number of values above zero: {above_zero_count}")
 
-# List all radar files in the folder
-radar_files = [f for f in os.listdir(radar_folder) if f.endswith('.nc')]
+# List all radar files in the folder and sort them alphabetically
+radar_files = sorted([f for f in os.listdir(radar_folder) if f.endswith('.nc')])
 
 #number of columns and rows for radar data
 ncols_radar = 620
@@ -150,7 +142,7 @@ print('grid radar_lon',np.shape(radar_lon_grid), radar_lon_grid)
 print('grid rain_rate',np.shape(rain_rate_grid),rain_rate_grid)
 
 # define area of work for the project for cropping the data 
-lon_min, lon_max, lat_min, lat_max = 5. , 9. , 48. , 52 #Germany Floods 2021 -->Different than EXPATS!
+#lon_min, lon_max, lat_min, lat_max = 5. , 9. , 48. , 52 #Germany Floods 2021 -->Different than EXPATS!
 # cropped_data, cropped_lat, cropped_lon = crop_radar_data(rain_rate_grid, radar_lat_grid, radar_lon_grid, lat_min, lat_max, lon_min, lon_max)
 
 # print('crop_radar_lat',np.shape(cropped_data), cropped_data)
@@ -163,11 +155,14 @@ lon_min, lon_max, lat_min, lat_max = 5. , 9. , 48. , 52 #Germany Floods 2021 -->
 # print(f"Number of NaN values: {nan_count}")
 # print(f"Number of values above zero: {above_zero_count}")
 
+# Specify the units and calendar type for your time variable
+time_units = 'hours since 2000-01-01 00:00:00'
+calendar_type = 'gregorian'
+
 #check with a plot before and after the crop
-plot_data(rain_rate_grid,radar_lat_grid,radar_lon_grid, 'original_grid', False)
+plot_data(rain_rate_grid,radar_lat_grid,radar_lon_grid, time, 'original_grid', False)
 #plot_data(cropped_data, cropped_lat, cropped_lon, 'orginial_grid_cropped', False)
-plt.show()
-plt.close()
+
 
 
 # Loop through each radar file
@@ -175,24 +170,21 @@ for radar_file in radar_files:
     full_path = os.path.join(radar_folder, radar_file)
     time, radar_lat, radar_lon, rain_rate = read_radar_data_with_lat_lon(full_path)
 
-    #crop data
-    #cropped_data, cropped_lat, cropped_lon = crop_radar_data(rain_rate, radar_lat, radar_lon, lat_min, lat_max, lon_min, lon_max)
-
     # Regrid the data
     regridded_data = regrid_data(radar_lat, radar_lon, rain_rate, msg_lat_grid, msg_lon_grid)
 
-    print('msg lat',np.shape(msg_lat))
-    print('msg lon',np.shape(msg_lon))
-    print('regrid radar',np.shape(regridded_data),regridded_data)
-    # Count NaN values
-    nan_count = np.count_nonzero(np.isnan(regridded_data))
-    # Count values above zero
-    above_zero_count = np.count_nonzero(regridded_data > 0)
-    print(f"Number of NaN values: {nan_count}")
-    print(f"Number of values above zero: {above_zero_count}")
-    
+    # print('msg lat',np.shape(msg_lat))
+    # print('msg lon',np.shape(msg_lon))
+    # print('regrid radar',np.shape(regridded_data),regridded_data)
+    # # Count NaN values
+    # nan_count = np.count_nonzero(np.isnan(regridded_data))
+    # # Count values above zero
+    # above_zero_count = np.count_nonzero(regridded_data > 0)
+    # print(f"Number of NaN values: {nan_count}")
+    #print(f"Number of values above zero: {above_zero_count}")
+
     #plot the regrid
-    plot_data(regridded_data, msg_lat_grid, msg_lon_grid, 'regridded', False)
+    plot_data(regridded_data, msg_lat_grid, msg_lon_grid, time, 'regridded', False)
     plt.show()
     plt.close()
     exit()
@@ -217,18 +209,14 @@ for radar_file in radar_files:
             latitudes_nc = nc.createVariable('latitude', 'f4', ('lat',))
             longitudes_nc = nc.createVariable('longitude', 'f4', ('lon',))
             regridded_rain = nc.createVariable('regridded_rain_rate', 'f4', ('time', 'lat', 'lon',), fill_value=np.nan)
-
-            # Assign data
-            # Specify the units and calendar type for your time variable
-            time_units = 'hours since 2000-01-01 00:00:00'
-            calendar_type = 'gregorian'
-
+            
             # Convert the cftime objects to numeric values
             numeric_time_values = date2num(time, units=time_units, calendar=calendar_type)
 
+            # Assign data
+
             # Now you can assign these numeric values to the NetCDF variable
             times_nc[:] = numeric_time_values
-            #times_nc[:] = time
             latitudes_nc[:] = msg_lat
             longitudes_nc[:] = msg_lon
             regridded_rain[0, :, :] = regridded_data
