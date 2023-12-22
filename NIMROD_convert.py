@@ -13,6 +13,7 @@ import array
 import numpy as np
 import matplotlib as mpl
 from glob import glob
+import os
     
 
 # check to see if gride cell resolution is same in both dimensions
@@ -155,8 +156,12 @@ def show_radar_image(full_filepath):
 ########  
 
 #directories paths
-fpath = '/home/daniele/Documenti/PhD_Cologne/Case Studies/Germany_Flood_2021/rain_products/nimrod/20210715_dat/'
-save_dir = '/home/daniele/Documenti/PhD_Cologne/Case Studies/Germany_Flood_2021/rain_products/nimrod/20210715_asc/'
+fpath = '/home/daniele/Documenti/PhD_Cologne/Case_Studies/Germany_Flood_2021/rain_products/nimrod/20210713_dat/'
+save_dir = '/home/daniele/Documenti/PhD_Cologne/Case_Studies/Germany_Flood_2021/rain_products/nimrod/20210713_asc/'
+
+# Ensure the output folder exists, create if not
+if not os.path.exists(save_dir):
+    os.makedirs(save_dir)
 
 # for multiple files. You do not need to specify a basename if you want to conver ALL files in dir.
 basename = "*composite.dat"

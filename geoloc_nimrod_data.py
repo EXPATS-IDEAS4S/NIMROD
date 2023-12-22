@@ -1,3 +1,10 @@
+"""
+Geolocalize the ascii forat of nimrod data
+The lat lon grid is the saved together with the rainfall rates in a netCDF format
+
+author: Daniele Corradini
+last edit: 22 Dic 2023
+"""
 import os
 import numpy as np
 from netCDF4 import Dataset, date2num
@@ -12,10 +19,10 @@ import pyproj
 plot = True
 
 # Directory containing ASCII files and NC file
-ascii_dir = '/home/daniele/Documenti/PhD_Cologne/Case Studies/Germany_Flood_2021/rain_products/nimrod/20210715_asc/'
+ascii_dir = '/home/daniele/Documenti/PhD_Cologne/Case_Studies/Germany_Flood_2021/rain_products/nimrod/20210713_asc/'
 
 # Folder to save the NetCDF file
-output_folder = '/home/daniele/Documenti/PhD_Cologne/Case Studies/Germany_Flood_2021/rain_products/nimrod/'
+output_folder = '/home/daniele/Documenti/PhD_Cologne/Case_Studies/Germany_Flood_2021/rain_products/nimrod/'
 
 # Ensure the output folder exists, create if not
 if not os.path.exists(output_folder):
