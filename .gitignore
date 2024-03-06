@@ -5,4 +5,8 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
 
+#nohup
+nohup.out
+
+
 
