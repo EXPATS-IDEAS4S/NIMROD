@@ -18,10 +18,15 @@ import cartopy.feature as cfeature
 from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
 import imageio
 import datetime
+import sys
+import xarray as xr
+
+sys.path.append('/home/dcorradi/Documents/Codes/NIMROD/')
+#from readers.read_functions import 
+from figures.plot_functions import set_map_plot, plot_rain_data
 
 
-
-def plot_msg_channels_and_rain_rate(rain_rate_ds, msg_ds, path_out, lonmin, lonmax, latmin, latmax, vis_channels, ir_channels, min_values, max_values):
+def plot_msg_channels_and_rain_rate(rain_ds, msg_ds, path_out, extent, vis_channels, ir_channels, min_values, max_values):
     """
     Plots the rain rate alongside various visible (VIS) and infrared (IR) channels from MSG data on a multi-panel figure.
 
@@ -46,117 +51,62 @@ def plot_msg_channels_and_rain_rate(rain_rate_ds, msg_ds, path_out, lonmin, lonm
     # Create a figure with subplots
     fig, axs = plt.subplots(nrows=3, ncols=4, figsize=(18, 10), subplot_kw={'projection': ccrs.PlateCarree()})
     axs = axs.flatten()
-
-    # Specify the units and calendar type for your time variable
-    time_units = 'hours since 2000-01-01 00:00:00'
-    calendar_type = 'gregorian'
-
-    #get lon and lat grid and rain rate
-    with Dataset(rain_rate_ds, 'r') as nc_rain:
-        #print(nc.variables)
-        lats = nc_rain['latitude'][:] 
-        lons = nc_rain['longitude'][:]
-        rain_rate = nc_rain['rain_rate'][:]
-        #print(rain_rate)
-        time = nc_rain['time']
-        time = num2date(time[:], units=time_units, calendar=calendar_type)[0]
         
     # Plot rain rate
+    time = str(rain_ds.coords['time'].values[0]).split('.')[0]
+    print(time)
+    lats = rain_ds.coords['lat'].values
+    lons = rain_ds.coords['lon'].values
+    lat_grid, lon_grid = np.meshgrid(lats,lons,indexing='ij')
+    rain_rate = rain_ds.variables['rain_rate'].values.squeeze()
+
+    #set up plot 
     cmap = plt.cm.gist_ncar.copy()
     norm = mcolors.PowerNorm(gamma=0.4)
-    mesh = axs[0].contourf(lons, lats, rain_rate, cmap=cmap, norm=norm, transform=ccrs.PlateCarree(), extend='max', alpha=0.4, levels=np.linspace(0, 100, 500))
-    axs[0].coastlines()
-    axs[0].set_title('Rain Rate', fontsize=10)
-
-    # Add colorbar with reduced size
-    cbar = plt.colorbar(mesh, label='Rain Rate (mm/h)', shrink=0.8)
-
-    # Adds coastlines and borders to the current axes
-    axs[0].coastlines(resolution='50m', linewidths=0.5) 
-    axs[0].add_feature(cfeature.BORDERS, linewidth=0.5, edgecolor='black')
-
-    #set axis thick labels
-    gl = axs[0].gridlines(crs=ccrs.PlateCarree(), draw_labels=True,
-                    linewidth=0, color='gray', alpha=0.5, linestyle='--')
-    gl.top_labels = False
-    gl.right_labels = False
-    gl.xlines = False
-    gl.xformatter = LONGITUDE_FORMATTER
-    gl.yformatter = LATITUDE_FORMATTER
-    gl.xlabel_style = {'size': 10, 'color': 'black'}
-    gl.ylabel_style = {'size': 10, 'color': 'black'}
-
-    # Set the extent to the specified domain
-    axs[0].set_extent([lonmin, lonmax, latmin, latmax], crs=ccrs.PlateCarree())
+    axs[0].contourf(lon_grid, lat_grid, rain_rate, cmap=cmap, norm=norm, transform=ccrs.PlateCarree(), extend='max', alpha=0.4, levels=np.linspace(0, 100, 500))
+    set_map_plot(axs[0],norm,cmap,extent,'Rain Rate','Rain Rate (mm/h)')
 
     #get channels value
-    with Dataset(msg_ds, 'r') as nc_msg:
-        #print(nc_msg.variables)
-        for i, ch in enumerate(channels):
-            ch_values = nc_msg[ch][:]
-            ch_values = np.flip(ch_values[0,:,:]) 
-            vmin = min_values[i]
-            vmax = max_values[i]
+    for i, ch in enumerate(channels):
+        ch_values = msg_ds.variables[ch].values.squeeze()
+        #ch_values = np.flip(ch_values[0,:,:]) 
+        vmin = min_values[i]
+        vmax = max_values[i]
 
-            if ch in vis_channels:
-                cmap = 'ocean'
-                unit = 'Reflectance (%)'
-                # Extracting the timestamp part from the filename
-                time_msg = msg_ds.split('/')[-1].split('-')[-1].split('.')[0]
+        #set cmap, label and normalize the colorbar
+        cmap = assign_cmap_to_channel(ch,vis_channels,ir_channels)
+        unit = assign_label_to_channel(ch,vis_channels,ir_channels)
+        norm = colors.Normalize(vmin=vmin, vmax=vmax)
 
-                # Extracting the hour part from the timestamp
-                hour = time_msg[8:10]
-
-                # Check if hour is within the specified range
-                if not ('04' <= hour < '17'):
-                    # Fill ch_values with NaN if hour is outside the range '04' to '17'
-                    ch_values = np.full(ch_values.shape, np.nan)
-            elif ch in ir_channels:
-                cmap = 'coolwarm'
-                unit = 'Brightness Temp (K)'
-            else:
-                print('wrong channel name')
-
-            # Create a Normalize object
-            norm = colors.Normalize(vmin=vmin, vmax=vmax)
-
-            # Create a ScalarMappable with the normalization and colormap
-            sm = cm.ScalarMappable(norm=norm, cmap=cmap)
-            sm.set_array([])
-        
-            mesh = axs[i+1].contourf(lons, lats, ch_values, norm=norm, transform=ccrs.PlateCarree(), cmap=cmap)
-            plt.colorbar(sm, label= unit, ax=axs[i+1], shrink=0.8)
-
-            axs[i+1].set_facecolor('#dcdcdc')
-            axs[i+1].coastlines()
-            axs[i+1].set_title('Channel '+ch, fontsize=10)
-
-            #set axis thick labels
-            gl = axs[i+1].gridlines(crs=ccrs.PlateCarree(), draw_labels=True,
-                            linewidth=0, color='gray', alpha=0.5, linestyle='--')
-            gl.top_labels = False
-            gl.right_labels = False
-            gl.xlines = False
-            gl.xformatter = LONGITUDE_FORMATTER
-            gl.yformatter = LATITUDE_FORMATTER
-            gl.xlabel_style = {'size': 10, 'color': 'black'}
-            gl.ylabel_style = {'size': 10, 'color': 'black'}
-
-            # Adds coastlines and borders to the current axes
-            axs[i+1].coastlines(resolution='50m', linewidths=0.5) 
-            axs[i+1].add_feature(cfeature.BORDERS, linewidth=0.5, edgecolor='black')
-
-            # Set the extent to the specified domain
-            axs[i+1].set_extent([lonmin, lonmax, latmin, latmax], crs=ccrs.PlateCarree())
+        set_map_plot(axs[i+1],norm,cmap,extent,'Channel '+ch,unit)        
+        axs[i+1].contourf(lons, lats, ch_values, norm=norm, transform=ccrs.PlateCarree(), cmap=cmap)
+        axs[i+1].set_facecolor('#dcdcdc')
 
     # Adjust layout
     fig.suptitle(f"MSG and Rain Rate Data for Time: {time}", fontsize=12, fontweight='bold', y=0.98)
     plt.subplots_adjust(hspace=0.3, wspace=0.4)  
     plt.tight_layout()
     #plt.show()
-    fig.savefig(path_out+'maps/multichannels_map_'+str(time)+'.png', bbox_inches='tight')#, transparent=True)
+    fig.savefig(path_out+'maps/multichannels_map_'+str(time).replace(' ','_')+'.png', bbox_inches='tight')#, transparent=True)
     plt.close()
 
+
+def assign_cmap_to_channel(ch,vis_channels,ir_channels):
+    if ch in vis_channels:
+        return 'gray'
+    elif ch in ir_channels:
+        return 'coolwarm'
+    else:
+        print('wrong channel name')
+
+
+def assign_label_to_channel(ch,vis_channels,ir_channels):
+    if ch in vis_channels:
+        return 'Reflectance (%)'
+    elif ch in ir_channels:
+        return 'Brightness Temp (K)'
+    else:
+        print('wrong channel name')
 
 
 
@@ -188,14 +138,6 @@ def create_gif_from_folder(folder_path, output_path, duration=0.5):
     imageio.mimsave(output_path, images, duration=duration)
 
 
-def get_max_min(ds,ch):
-    ch_values = ds[ch][:]
-    ch_values = ch_values.values.flatten()
-    ch_values = ch_values[~np.isnan(ch_values)]
-    max = np.amax(ch_values)
-    min = np.amin(ch_values)
-
-    return min, max
 
 
 def plot_distributions(rain_rate_ds, msg_ds, msg_ds_day, path_out, vis_channels, ir_channels):

@@ -11,15 +11,17 @@ import xarray as xr
 
 #import own methods
 sys.path.append('/home/dcorradi/Documents/Codes/NIMROD/')
-from figures.plot_functions import plot_data
+from figures.plot_functions import plot_rain_data
 from readers.read_functions import read_msg_lat_lon, read_radar_data_with_lat_lon
 from process_functions import crop_radar_data, regrid_data, check_grid
 
 #import variables from config file
 from config_process import msg_folder, reg_lats, reg_lons, msg_filepattern
 from config_process import radar_folder, output_folder, radar_filepattern, fig_folder
-from config_process import ncols_radar, nrows_radar
+from config_process import ncols_radar, nrows_radar, lon_max, lon_min, lat_max, lat_min
 from config_process import save, regular_grid
+
+extent = [lon_min, lon_max, lat_min, lat_max] #[left, right, bottom ,top]
 
 # Read MSG lat/lon data
 if regular_grid:
@@ -48,7 +50,7 @@ radar_lat_grid = radar_lat.reshape(nrows_radar, ncols_radar)
 #check_grid(radar_lat_grid,radar_lon_grid,rain_rate_grid,'radar grid')
 
 #check with a plot before and after the crop
-plot_data(rain_rate_grid,radar_lat_grid,radar_lon_grid, time, 'original_grid', fig_folder)
+plot_rain_data(rain_rate_grid,radar_lat_grid,radar_lon_grid, time, 'original_grid', extent, fig_folder)
 
 # #define area of work for the project for cropping the data 
 # cropped_data, cropped_lat, cropped_lon = crop_radar_data(rain_rate_grid, radar_lat_grid, radar_lon_grid, lat_min, lat_max, lon_min, lon_max)
@@ -71,7 +73,7 @@ for radar_file in radar_files:
     #check_grid(msg_lat_grid,msg_lon_grid,regridded_data,'radar regrid')
 
     #plot the regrid
-    plot_data(regridded_data, msg_lat_grid, msg_lon_grid, time, 'regridded', fig_folder)
+    plot_rain_data(regridded_data, msg_lat_grid, msg_lon_grid, time, 'regridded', extent, fig_folder)
     #exit()
 
     if save:
