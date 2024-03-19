@@ -53,11 +53,11 @@ def regrid_data(radar_lat, radar_lon, radar_data, msg_lat_grid, msg_lon_grid, me
     Parameters
     ----------
     radar_lat : ndarray
-        1D or 2D array of latitude coordinates for the radar data.
+        1D  array of latitude coordinates for the radar data.
     radar_lon : ndarray
-        1D or 2D array of longitude coordinates for the radar data.
+        1D array of longitude coordinates for the radar data.
     radar_data : ndarray
-        1D or 2D array of radar data values.
+        1D array of radar data values.
     msg_lat_grid : ndarray
         2D array of MSG latitude grid points.
     msg_lon_grid : ndarray

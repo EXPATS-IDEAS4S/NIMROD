@@ -5,6 +5,7 @@ import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
 import matplotlib.cm as cm
+from matplotlib.patches import Patch
 
 
 def plot_rain_data(rain_data, lat, lon, time, title,extent, save=None):
@@ -44,13 +45,14 @@ def plot_rain_data(rain_data, lat, lon, time, title,extent, save=None):
 
 
 
-def set_map_plot(ax, norm, cmap, extent, plot_title, label):
+def set_map_plot(ax, norm, cmap, extent, plot_title, label, colorbar=True):
     # Create a ScalarMappable with the normalization and colormap
     sm = cm.ScalarMappable(norm=norm, cmap=cmap)
     sm.set_array([])
 
     # Add color bar
-    plt.colorbar(sm, ax=ax, orientation='vertical', label=label, shrink=0.8)
+    if colorbar:
+        plt.colorbar(sm, ax=ax, orientation='vertical', label=label, shrink=0.8)
 
     #set axis thick labels
     gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True,
@@ -69,3 +71,45 @@ def set_map_plot(ax, norm, cmap, extent, plot_title, label):
     ax.set_extent(extent) #[left, right, bottom ,top]
 
     ax.set_title(plot_title, fontsize=12, fontweight='bold')
+
+
+
+def plot_cma(data, lat, lon, time, title, extent, save=None):
+    """
+    Plots cloud mask data (0 for clear, 1 for cloudy) on a map using a binary color map with Matplotlib and Cartopy.
+    Adds geographical features for context, and optionally saves the plot to a file.
+
+    Parameters:
+    - data (numpy.ndarray): 2D array of cloud mask data (0 for clear, 1 for cloudy).
+    - lat (numpy.ndarray): 2D array of latitude values.
+    - lon (numpy.ndarray): 2D array of longitude values.
+    - time (datetime or str): Time corresponding to the data snapshot.
+    - title (str): Title for the plot.
+    - extent (list): Geographical extent [west, east, south, north] for the plot.
+    - save (str, optional): Path to save the plot image. If None, the plot is not saved.
+    """
+    # Set up the binary colormap: 0 (clear) as blsck, 1 (cloudy) as white
+    cmap = mcolors.ListedColormap(['black', 'white'])
+    bounds = [-0.5, 0.5, 1.5]
+    norm = mcolors.BoundaryNorm(bounds, cmap.N)
+
+    fig, ax = plt.subplots(figsize=(10, 8), subplot_kw={'projection': ccrs.PlateCarree()})
+    #ax.set_extent(extent, crs=ccrs.PlateCarree())
+
+    # Plot the cloud mask data
+    mesh = ax.pcolormesh(lon, lat, data, cmap=cmap, norm=norm, transform=ccrs.PlateCarree())
+
+    set_map_plot(ax,norm,cmap,extent,title+': '+str(time),'',False)
+
+    # Add a legend for cloud mask
+    legend_labels = [Patch(facecolor='white', edgecolor='black', label='Cloudy'),
+                     Patch(facecolor='black', edgecolor='black', label='Clear')]
+    ax.legend(handles=legend_labels, loc='lower left', title="")
+
+    # Save the plot
+    if save:
+        date_string = time.strftime('%Y-%m-%d %H:%M')
+        plot_filename = save+title+'_'+date_string.replace(' ','_')+'_'+title+'.png'
+        fig.savefig(plot_filename, dpi=300, bbox_inches='tight')
+        print(f"Plot saved as {plot_filename}")
+        plt.close()
