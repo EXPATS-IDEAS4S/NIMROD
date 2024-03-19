@@ -140,19 +140,17 @@ def mask_nighttime_values(ds, time_var_name, vis_channels, start_hour, end_hour)
     return ds
 
 
-def filter_rain_rate_and_msg_channels(rain_rate_ds, msg_ds, threshold=0.1):
+def filter_rain_rate(rain_rate_ds, threshold=0.1):
     """
     Filters out points where the rain rate is below the specified threshold
     and applies the same filter to corresponding MSG channel data.
     
     Parameters:
     - rain_rate_ds: xarray.Dataset containing the rain rate data.
-    - msg_ds: xarray.Dataset containing the MSG channel data.
     - threshold: float, the minimum rain rate value to include.
     
     Returns:
     - filtered_rain_rate_ds: xarray.Dataset with rain rate data filtered.
-    - filtered_msg_ds: xarray.Dataset with MSG data filtered similarly.
     """
     # Create a mask where the rain rate is greater than or equal to the threshold
     mask = rain_rate_ds['rain_rate'] >= threshold
@@ -162,8 +160,34 @@ def filter_rain_rate_and_msg_channels(rain_rate_ds, msg_ds, threshold=0.1):
     
     # Apply the same mask to each channel in the MSG dataset
     # We iterate over all variables assuming they are the channels to be filtered
+    #filtered_msg_ds = msg_ds.where(mask)#, drop=True)
+    
+    return filtered_rain_rate_ds
+
+
+def filter_by_cloud_mask(msg_ds, cma_ds):
+    """
+    Filters out points where the cloud mask indicates clear sky (value 0)
+    and applies the same filter to corresponding rain rate data and other MSG channel data.
+    
+    Parameters:
+    - msg_ds: xarray.Dataset containing the MSG channel data.
+    - cma_ds: xarray.Dataset containing the cloud mask data
+    
+    Returns:
+    - filtered_msg_ds: xarray.Dataset with MSG data filtered based on cloud mask.
+    """
+    # Create a mask where the cloud mask indicates clouds (value not equal to 0)
+    #print(cma_ds['cma'].values)
+    mask = cma_ds['cma'] == 1
+    
+    # Apply this mask to the rain rate dataset
+    #filtered_rain_rate_ds = rain_rate_ds.where(mask)#, drop=True)
+    
+    # Apply the same mask to the MSG dataset
+    # Assuming all variables in the msg_ds should be filtered by the cloud mask
     filtered_msg_ds = msg_ds.where(mask)#, drop=True)
     
-    return filtered_rain_rate_ds, filtered_msg_ds
+    return filtered_msg_ds
 
 

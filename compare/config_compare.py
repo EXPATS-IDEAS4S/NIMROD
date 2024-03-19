@@ -11,6 +11,10 @@ msg_filepattern = "MSG4-SEVI-MSG15-0100-NA-*.nc"
 rain_path = '/work/case_studies_expats/Germany_Flood_2021/data/rain_products/nimrod/nc_files_reg_grid/'
 rain_filepattern = "regridded_nimrod_rain_data_eu_*.nc"
 
+#path to cloud mask
+cma_path = "/work/case_studies_expats/Germany_Flood_2021/data/cloud_products/CMA_NWCSAF/Processed/"
+cma_filepattern = "S_NWC_CMA_MSG4_FLOOD-GER-2021-VISIR_*.nc"
+
 #path to fig
 path_outputs = '/work/case_studies_expats/Germany_Flood_2021/Fig/nimrod_msg_analysis/'
 
