@@ -28,3 +28,7 @@ lonmin, latmin, lonmax, latmax= 5, 48, 9, 52
 
 #Flag to choose wich grid (True: regular grid, False: MSG native grid)
 regular_grid = True
+
+#define rain classes
+rain_class_thresholds = [0.1,2.5,10] #from WMO8
+rain_class_names = ['no-rain','light','moderate','heavy'] 
