@@ -143,29 +143,65 @@ def mask_nighttime_values(ds, time_var_name, vis_channels, start_hour, end_hour)
     return ds
 
 
-def filter_rain_rate(rain_rate_ds, threshold=0.1):
+def filter_rain_rate(rain_rate_ds, min_threshold, max_threshold):
     """
-    Filters out points where the rain rate is below the specified threshold
-    and applies the same filter to corresponding MSG channel data.
+    Filters the input xarray.Dataset containing rain rate data to include only data points
+    where the rain rate is within the specified minimum and maximum thresholds, inclusive.
     
     Parameters:
-    - rain_rate_ds: xarray.Dataset containing the rain rate data.
-    - threshold: float, the minimum rain rate value to include.
+    - rain_rate_ds (xarray.Dataset): The dataset containing the rain rate data. 
+      It is expected to have a variable named 'rain_rate' representing the rain rate values.
+    - min_threshold (float): The minimum rain rate value to include.
+    - max_threshold (float): The maximum rain rate value to include.
     
     Returns:
-    - filtered_rain_rate_ds: xarray.Dataset with rain rate data filtered.
+    - xarray.Dataset: A dataset with the rain rate data filtered according to the specified thresholds.
     """
-    # Create a mask where the rain rate is greater than or equal to the threshold
-    mask = rain_rate_ds['rain_rate'] >= threshold
+    # Ensure that the input thresholds are valid
+    if min_threshold > max_threshold:
+        raise ValueError("The minimum threshold cannot be greater than the maximum threshold.")
+
+    # Create a mask where the rain rate is between the minimum and maximum thresholds (inclusive)
+    mask = (rain_rate_ds['rain_rate'] >= min_threshold) & (rain_rate_ds['rain_rate'] <= max_threshold)
     
-    # Apply this mask to the rain rate dataset
-    filtered_rain_rate_ds = rain_rate_ds.where(mask)#, drop=True)
-    
-    # Apply the same mask to each channel in the MSG dataset
-    # We iterate over all variables assuming they are the channels to be filtered
-    #filtered_msg_ds = msg_ds.where(mask)#, drop=True)
+    # Apply this mask to the rain rate dataset, keeping only the data points that match the condition
+    filtered_rain_rate_ds = rain_rate_ds.where(mask)
     
     return filtered_rain_rate_ds
+
+
+
+
+def filter_elevation(msg_ds, rain_ds, oro_ds, elev_class):
+    """
+    Filters datasets based on elevation ranges and returns the filtered rain and MSG datasets.
+    
+    Parameters:
+    - msg_ds: xarray.Dataset containing MSG channel data.
+    - rain_ds: xarray.Dataset containing the rain rate data.
+    - oro_ds: xarray.Dataset containing orography (elevation) data.
+    - elev_class: tuple or list with two elements specifying the minimum and maximum elevation
+                  range to include (min_elevation, max_elevation).
+    
+    Returns:
+    - filtered_rain_ds: xarray.Dataset with rain data filtered based on the elevation range.
+    - filtered_msg_ds: xarray.Dataset with MSG data filtered based on the same elevation range.
+    """
+    # Ensure elevation range is specified correctly
+    if not isinstance(elev_class, (list, tuple)) or len(elev_class) != 2:
+        raise ValueError("elev_class must be a list or tuple with two elements (min, max elevation).")
+
+    # Create a mask where the elevation is within the specified range
+    mask = (oro_ds['orography'] > elev_class[0]) & (oro_ds['orography'] <= elev_class[1])
+    
+    # Apply this mask to the rain dataset
+    filtered_rain_ds = rain_ds.where(mask)
+
+    # Apply the same mask to the MSG dataset. Assuming all variables within msg_ds should be filtered.
+    filtered_msg_ds = msg_ds.where(mask)
+    
+    return filtered_rain_ds, filtered_msg_ds
+
 
 
 def filter_by_cloud_mask(msg_ds, cma_ds):
@@ -319,7 +355,7 @@ def calculate_ets_across_thresholds(msg_ds, channel_name,vis_channels,ir_channel
     return df_ets
 
 
-def save_ets_thresholds_channels_trends(msg_ds, rain_ds, vis_channels, ir_channels, rain_thresholds, rain_classes, threshold_n_bin, path_out):
+def save_ets_thresholds_channels_trends(msg_ds, rain_ds, vis_channels, ir_channels, rain_thresholds, elev_class, threshold_n_bin, path_out):
     # definel all list of channels
     channels = vis_channels+ir_channels
 
@@ -327,22 +363,27 @@ def save_ets_thresholds_channels_trends(msg_ds, rain_ds, vis_channels, ir_channe
     df = pd.DataFrame(columns=['Rain_Threshold','Channel','MSG_Threshold','ETS'])
 
     #loop over the different rain classifications
-    for n, rain_threshold in enumerate(rain_thresholds):
+    for rain_threshold in rain_thresholds:
         print('\nrain threshold: ', rain_threshold)
         if rain_threshold!=0.1:
-            rain_ds = filter_rain_rate(rain_ds)
+            rain_max = get_max_min(rain_ds,'rain_rate')[1]
+            rain_ds = filter_rain_rate(rain_ds,0.1,rain_max)
         
         #generate y_true on the current threshold for the rain rate
         y_true = np.where(rain_ds['rain_rate']>= rain_threshold, 1, 0)
         y_true = y_true.flatten()
 
         #read the medians of the rain classes distributions
-        msg_intervals = extract_medians(path_out+'channel_stats.txt',channels,rain_classes[n])
+        #msg_intervals = extract_medians(path_out+'channel_stats.txt',channels,rain_classes[n])
+        
 
-        for i,channel in enumerate(channels):
+        for channel in channels:
             print('\nchannel: ', channel)
+            #find interval for the threshold
+            msg_min, msg_max = get_max_min(msg_ds,channel)
+
             #define the threshold
-            thresholds = np.linspace(msg_intervals[i][0], msg_intervals[i][1], threshold_n_bin)
+            thresholds = np.linspace(msg_min, msg_max, threshold_n_bin)
 
             #calculate the ets for every threshold
             df_ets = calculate_ets_across_thresholds(msg_ds,channel,vis_channels,ir_channels,y_true,thresholds, rain_threshold)
@@ -350,7 +391,7 @@ def save_ets_thresholds_channels_trends(msg_ds, rain_ds, vis_channels, ir_channe
             df = pd.concat([df, df_ets], ignore_index=True)
 
     #save dataFrame
-    df.to_csv(path_out+"ets_results.csv", index=False)
+    df.to_csv(path_out+"ets_results_"+elev_class+".csv", index=False)
 
 
 
@@ -376,3 +417,247 @@ def extract_medians(file_path, channels, rain_classes):
                         medians[-1] += (median_value,)
     
     return medians
+
+
+def select_max_ets_thresholds(input_csv, output_csv):
+    # Load the CSV file
+    df = pd.read_csv(input_csv)
+    
+    # Group by 'Rain_Threshold' and 'Channel', then get the row with the max ETS for each group
+    max_ets_rows = df.loc[df.groupby(['Rain_Threshold', 'Channel'])['ETS'].idxmax()]
+    
+    # Save the results to another CSV file
+    max_ets_rows.to_csv(output_csv, index=False)
+
+
+def save_metrics_thresholds_channels(msg_ds, rain_ds, vis_channels, ir_channels, rain_thresholds, elev_class, path_out):
+    # definel all list of channels
+    channels = vis_channels+ir_channels
+
+    # Define array to store metrics
+    results = []
+
+    #loop over the different rain classifications
+    for rain_threshold in rain_thresholds:
+        print('\nrain threshold: ', rain_threshold)
+        if rain_threshold!=0.1:
+            rain_ds = filter_rain_rate(rain_ds)
+        
+        #generate y_true on the current threshold for the rain rate
+        y_true = np.where(rain_ds['rain_rate']>= rain_threshold, 1, 0)
+        y_true = y_true.flatten()       
+
+        for channel in channels:
+            print('\nchannel: ', channel)
+            #define the threshold
+            msg_threshold = find_max_ets_threshold(path_out+"ets_results_"+elev_class+".csv",channel,rain_threshold)
+
+            # Generate y_pred based on the current threshold for the channel
+            if channel in vis_channels:
+                y_pred = np.where(msg_ds[channel] >= msg_threshold, 1, 0)
+            elif channel in ir_channels:
+                y_pred = np.where(msg_ds[channel] > msg_threshold, 0, 1)
+            else:
+                print('wrong channel name!')
+            y_pred = y_pred.flatten()
+
+            #find mask that exclude nan values for both arrays
+            mask = (~np.isnan(y_true)) & (~np.isnan(y_pred))
+            y_true = y_true[mask]
+            y_pred = y_pred[mask]
+            #print('y pred ',len(y_pred))
+            #print('y true ', len(y_true))
+
+            # Calculate metrics
+            metrics = calculate_categorical_metrics(y_true, y_pred, labels=[0,1])
+            pod = metrics['Probability of Detection']
+            far = metrics['False Alarm Ratio'] 
+            bias = metrics['Multiplicative Bias']
+            csi = metrics['Critical Success Index'] 
+            ets = metrics['Equitable Threat Score']
+            
+            # Append the threshold and ETS to the results
+            results.append((rain_threshold, channel, msg_threshold, pod, far, bias, csi, ets))
+        
+    # Convert results to a DataFrame and save to CSV
+    df = pd.DataFrame(results, columns=['Rain_Threshold','Channel','MSG_Threshold', 'POD','FAR', 'BIAS','CSI','ETS'])     
+
+    #save dataFrame
+    df.to_csv(path_out+"dichotomy_metrics_results_"+elev_class+".csv", index=False)
+
+
+
+def find_max_ets_threshold(input_csv, channel, rain_threshold):
+    # Load the CSV
+    df = pd.read_csv(input_csv)
+    
+    # Filter the DataFrame for the given channel and rain threshold
+    filtered_df = df[(df['Channel'] == channel) & (df['Rain_Threshold'] == rain_threshold)]
+    
+    # Find the row with the maximum ETS
+    max_ets_row = filtered_df[filtered_df['ETS'] == filtered_df['ETS'].max()]
+    
+    # If multiple rows have the same max ETS, take the first one
+    if not max_ets_row.empty:
+        msg_threshold = max_ets_row.iloc[0]['MSG_Threshold']
+        return msg_threshold
+    else:
+        print('Max ETS not found!')
+        return None
+    
+
+
+def save_spatial_metrics(msg_ds,rain_ds, rain_threshold, vis_channels, ir_channels, path_out):
+    """
+    Plot the specified metric of spatial data over time on a geographical map.
+
+    Parameters:
+    - data (xarray.DataArray): The spatial data (must include lat and lon dimensions).
+    - metric (str): The metric to calculate and plot.
+    - time_step (str or None): Specific time step to plot. If None, uses all time steps.
+    """
+    channels = vis_channels+ir_channels
+
+    #compute y true
+    if rain_threshold!=0.1:
+        rain_ds = filter_rain_rate(rain_ds)
+        
+    #generate y_true on the current threshold for the rain rate
+    y_true = np.where(rain_ds['rain_rate']>= rain_threshold, 1, 0)
+    #y_true = y_true.flatten()  
+    
+    #get channels value
+    for channel in channels:
+        print('\nchannel: ', channel)
+        #define the threshold
+        msg_threshold = find_max_ets_threshold(path_out+"ets_results_whole_distribution.csv",channel,rain_threshold)
+
+        # Generate y_pred based on the current threshold for the channel
+        if channel in vis_channels:
+            y_pred = np.where(msg_ds[channel] >= msg_threshold, 1, 0)
+        elif channel in ir_channels:
+            y_pred = np.where(msg_ds[channel] > msg_threshold, 0, 1)
+        else:
+            print('wrong channel name!')
+
+        # Initialize an empty DataArray for ETS results
+        results_pod = xr.full_like(msg_ds.isel(time=0), fill_value=np.nan)
+        results_far = xr.full_like(msg_ds.isel(time=0), fill_value=np.nan)
+        results_bias = xr.full_like(msg_ds.isel(time=0), fill_value=np.nan)
+        results_csi = xr.full_like(msg_ds.isel(time=0), fill_value=np.nan)
+        results_ets = xr.full_like(msg_ds.isel(time=0), fill_value=np.nan)
+
+        # Loop through each spatial point
+        for lat in msg_ds.lat:
+            for lon in msg_ds.lon:
+                obs_time_series = y_true.sel(lat=lat, lon=lon)
+                forecast_time_series = y_pred.sel(lat=lat, lon=lon)
+
+                #find mask that exclude nan values for both arrays
+                mask = (~np.isnan(obs_time_series)) & (~np.isnan(forecast_time_series))
+                obs_time_series = obs_time_series[mask]
+                forecast_time_series = forecast_time_series[mask]
+
+                # Calculate metric for the current pixel
+                metrics = calculate_categorical_metrics(obs_time_series, forecast_time_series, labels=[0,1])
+                results_pod.loc[dict(lat=lat, lon=lon)] = metrics['Probability of Detection']
+                results_far.loc[dict(lat=lat, lon=lon)] =  metrics['False Alarm Ratio'] 
+                results_bias.loc[dict(lat=lat, lon=lon)] = metrics['Multiplicative Bias']
+                results_csi.loc[dict(lat=lat, lon=lon)] = metrics['Critical Success Index'] 
+                results_ets.loc[dict(lat=lat, lon=lon)] = metrics['Equitable Threat Score']
+
+    results_pod.to_netcdf(path_out+'pod_pixelwise_dichotomous_analysis.nc')
+    results_far.to_netcdf(path_out+'far_pixelwise_dichotomous_analysis.nc')
+    results_bias.to_netcdf(path_out+'bias_pixelwise_dichotomous_analysis.nc')
+    results_csi.to_netcdf(path_out+'csi_pixelwise_dichotomous_analysis.nc')
+    results_ets.to_netcdf(path_out+'ets_pixelwise_dichotomous_analysis.nc')
+        
+
+def save_spatial_metrics_to_dataset(msg_ds, rain_ds, rain_threshold, vis_channels, ir_channels, path_out):
+    """
+    Computes spatial metrics between MSG satellite channel data and observed rain rates, 
+    saving the results in a netCDF file.
+
+    This function processes each specified MSG channel against observed rain rates to 
+    calculate several metrics, including Probability of Detection (POD), False Alarm Ratio (FAR), 
+    Bias, Critical Success Index (CSI), and Equitable Threat Score (ETS). The calculations are 
+    performed pixel-wise across the spatial extent of the datasets, excluding the time dimension. 
+    The results are aggregated into a new xarray dataset mirroring the original MSG dataset's spatial 
+    dimensions and saved as a netCDF file.
+
+    Parameters:
+    - msg_ds (xarray.Dataset): MSG dataset containing satellite channel data.
+    - rain_ds (xarray.Dataset): Dataset containing observed rain rate data.
+    - rain_threshold (float): Threshold for defining rain events in the observed data.
+    - vis_channels (list): List of visible channel names to process.
+    - ir_channels (list): List of infrared channel names to process.
+    - path_out (str): Path to save the output netCDF file containing the metrics.
+
+    Returns:
+    - None: The function saves the results directly to a file and does not return any value.
+    """
+    channels = vis_channels + ir_channels
+    metrics_names = ['pod', 'far', 'bias', 'csi', 'ets']
+
+    # Initialize an empty dataset to hold results
+    metrics_ds = xr.Dataset()
+
+    #compute y true
+    if rain_threshold!=0.1:
+        rain_ds = filter_rain_rate(rain_ds)
+        
+    #generate y_true on the current threshold for the rain rate
+    y_true = np.where(rain_ds['rain_rate']>= rain_threshold, 1, 0)
+    
+    for channel in channels:
+        print('\nchannel: ', channel)
+        #define the threshold
+        msg_threshold = find_max_ets_threshold(path_out+"ets_results_whole_distribution.csv",channel,rain_threshold)
+
+        # Generate y_pred based on the current threshold for the channel
+        if channel in vis_channels:
+            y_pred = np.where(msg_ds[channel] >= msg_threshold, 1, 0)
+        elif channel in ir_channels:
+            y_pred = np.where(msg_ds[channel] > msg_threshold, 0, 1)
+        else:
+            print('wrong channel name!')
+
+        # Initialize dictionaries to hold metric results for current channel
+        channel_metrics = {name: xr.full_like(msg_ds[channel].isel(time=0, drop=True), fill_value=np.nan) for name in metrics_names}
+        #print(channel_metrics)
+        # Loop to calculate metrics and assign to the appropriate DataArray
+        lats = rain_ds.coords['lat'].values
+        lons = rain_ds.coords['lon'].values
+        for y,lat in enumerate(lats):
+            for x,lon in enumerate(lons):
+                #print('lat-lon:',lat,lon)
+                # Calculate array to compare
+                obs_time_series = y_true[:,y,x]
+                pred_time_series = y_pred[:,y,x]
+                #print(len(obs_time_series),obs_time_series)
+                #print(len(pred_time_series),pred_time_series)
+
+                #find mask that exclude nan values for both arrays
+                mask = (~np.isnan(obs_time_series)) & (~np.isnan(pred_time_series))
+                obs_time_series = obs_time_series[mask]
+                pred_time_series = pred_time_series[mask]
+                
+
+                # Calculate metric for the current pixel
+                metrics = calculate_categorical_metrics(obs_time_series, pred_time_series, labels=[0,1])
+                
+                # Example dummy metrics assignment
+                metrics = {'pod': metrics['Probability of Detection'], 'far': metrics['False Alarm Ratio'], 
+                           'bias':  metrics['Multiplicative Bias'], 'csi': metrics['Critical Success Index'], 
+                           'ets': metrics['Equitable Threat Score']}
+                
+                for name in metrics_names:
+                    #print(channel_metrics[name])
+                    channel_metrics[name].loc[dict(x=x, y=y)] = metrics[name]
+        
+        # After processing all points, add the metrics DataArrays to the dataset under current channel name
+        for name in metrics_names:
+            metrics_ds[f'{channel}_{name}'] = channel_metrics[name]
+    
+    # Save the dataset to a netCDF file
+    metrics_ds.to_netcdf(path_out + 'metrics_results_pixelwise_rain-th-'+str(rain_threshold)+'.nc')
