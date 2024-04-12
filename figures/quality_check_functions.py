@@ -24,9 +24,10 @@ import xarray as xr
 sys.path.append('/home/dcorradi/Documents/Codes/NIMROD/')
 #from readers.read_functions import 
 from figures.plot_functions import set_map_plot, plot_rain_data
+from compare.comparison_function import find_max_ets_threshold, get_max_min
 
 
-def plot_msg_channels_and_rain_rate(rain_ds, msg_ds, path_out, extent, vis_channels, ir_channels, min_values, max_values):
+def plot_msg_channels_and_rain_rate(rain_ds, msg_ds, elevation_ds, path_csv, path_out, extent, vis_channels, ir_channels, min_values, max_values, rain_threshold=None, msg_thresholds=False):
     """
     Plots the rain rate alongside various visible (VIS) and infrared (IR) channels from MSG data on a multi-panel figure.
 
@@ -51,6 +52,11 @@ def plot_msg_channels_and_rain_rate(rain_ds, msg_ds, path_out, extent, vis_chann
     # Create a figure with subplots
     fig, axs = plt.subplots(nrows=3, ncols=4, figsize=(18, 10), subplot_kw={'projection': ccrs.PlateCarree()})
     axs = axs.flatten()
+
+    # set up elevation
+    elevation = elevation_ds['orography'].values  
+    el_min, el_max = get_max_min(elevation_ds, 'orography')
+    contour_levels = np.linspace(el_min, el_max, num=10)  # Adjust number of levels as needed
         
     # Plot rain rate
     time = str(rain_ds.coords['time'].values[0]).split('.')[0]
@@ -58,6 +64,11 @@ def plot_msg_channels_and_rain_rate(rain_ds, msg_ds, path_out, extent, vis_chann
     lats = rain_ds.coords['lat'].values
     lons = rain_ds.coords['lon'].values
     lat_grid, lon_grid = np.meshgrid(lats,lons,indexing='ij')
+    if rain_threshold:
+        #mask the value based on the rain threshold
+        mask = rain_ds['rain_rate'] >= rain_threshold
+        # Apply this mask to the rain rate dataset, keeping only the data points that match the condition
+        rain_ds = rain_ds.where(mask)
     rain_rate = rain_ds.variables['rain_rate'].values.squeeze()
 
     #set up plot 
@@ -65,10 +76,21 @@ def plot_msg_channels_and_rain_rate(rain_ds, msg_ds, path_out, extent, vis_chann
     norm = mcolors.PowerNorm(gamma=0.4)
     axs[0].contourf(lon_grid, lat_grid, rain_rate, cmap=cmap, norm=norm, transform=ccrs.PlateCarree(), extend='max', alpha=0.4, levels=np.linspace(0, 100, 500))
     set_map_plot(axs[0],norm,cmap,extent,'Rain Rate','Rain Rate (mm/h)')
+    axs[0].contour(lons, lats, elevation, levels=contour_levels, colors='k', linewidths=0.5, alpha=0.5, transform=ccrs.PlateCarree())
 
     #get channels value
     for i, ch in enumerate(channels):
-        ch_values = msg_ds.variables[ch].values.squeeze()
+        if msg_thresholds:
+            #find the threshold that maximaze the ets
+            msg_th = find_max_ets_threshold(path_csv,ch,rain_threshold)
+            #mask the value based on the threshold
+            if ch in vis_channels:
+                mask = msg_ds[ch] >= msg_th
+            elif ch in ir_channels:
+                mask = msg_ds[ch] <= msg_th
+            # Apply this mask to the dataset, keeping only the data points that match the condition
+            msg_ds[ch] = msg_ds[ch].where(mask)
+        ch_values = msg_ds[ch].values.squeeze()
         #ch_values = np.flip(ch_values[0,:,:]) 
         vmin = min_values[i]
         vmax = max_values[i]
@@ -81,13 +103,15 @@ def plot_msg_channels_and_rain_rate(rain_ds, msg_ds, path_out, extent, vis_chann
         set_map_plot(axs[i+1],norm,cmap,extent,'Channel '+ch,unit)        
         axs[i+1].contourf(lons, lats, ch_values, norm=norm, transform=ccrs.PlateCarree(), cmap=cmap)
         axs[i+1].set_facecolor('#dcdcdc')
+        axs[i+1].contour(lons, lats, elevation, levels=contour_levels, colors='k', linewidths=0.5, alpha=0.5, transform=ccrs.PlateCarree())
 
     # Adjust layout
     fig.suptitle(f"MSG and Rain Rate Data for Time: {time}", fontsize=12, fontweight='bold', y=0.98)
     plt.subplots_adjust(hspace=0.3, wspace=0.4)  
     plt.tight_layout()
     #plt.show()
-    fig.savefig(path_out+'maps/multichannels_map_'+str(time).replace(' ','_')+'.png', bbox_inches='tight')#, transparent=True)
+    fig.savefig(path_out+'multichannels_map_'+str(time).replace(' ','_')+'.png', bbox_inches='tight')#, transparent=True)
+    print('\nFig saved in',path_out+'multichannels_map_'+str(time).replace(' ','_')+'.png')
     plt.close()
 
 

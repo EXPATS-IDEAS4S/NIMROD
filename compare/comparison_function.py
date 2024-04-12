@@ -91,6 +91,49 @@ def select_daytime_files_from_hour(fnames_msg, start_hour, end_hour):
     return fnames_msg_day
 
 
+def mask_nighttime_single_step(ds, time_var_name, vis_channels, start_hour, end_hour):
+    """
+    Masks (replaces with NaN) the values in VIS channels of an xarray Dataset if the time
+    of the dataset falls outside the specified daytime hours range. This function is designed
+    for datasets containing only one time step.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        The input dataset containing MSG channel values with a 'time' dimension.
+    time_var_name : str
+        The name of the coordinate time, e.g 'time' or 'end_time'
+    vis_channels : list of str
+        List of the visible channels names.
+    start_hour : int
+        The beginning of the daytime period in 24-hour format (e.g., 7 for 7 AM).
+    end_hour : int
+        The end of the daytime period in 24-hour format (e.g., 18 for 6 PM).
+
+    Returns
+    -------
+    xarray.Dataset
+        The dataset with values outside of the specified daytime hours replaced with NaN
+        across all VIS channels if the dataset's time falls outside the daytime hours.
+    """
+    # Convert start_hour and end_hour to integers
+    start_hour = int(start_hour)
+    end_hour = int(end_hour)
+
+    # Convert the 'time' coordinate to a pandas DatetimeIndex to extract the hour
+    dataset_time = pd.to_datetime(ds[time_var_name].values)
+
+    # Check if the dataset time falls outside the specified daytime hours
+    if not (start_hour <= dataset_time.hour <= end_hour):
+        # Loop through all data variables in the dataset
+        for var in ds.data_vars:
+            if var in vis_channels:
+                # Replace values with NaN
+                ds[var][:, ...] = np.nan
+
+    return ds
+
+
 def mask_nighttime_values(ds, time_var_name, vis_channels, start_hour, end_hour):
     """
     Masks (replaces with NaN) the values in VIS channels of an xarray Dataset for times 
@@ -441,7 +484,8 @@ def save_metrics_thresholds_channels(msg_ds, rain_ds, vis_channels, ir_channels,
     for rain_threshold in rain_thresholds:
         print('\nrain threshold: ', rain_threshold)
         if rain_threshold!=0.1:
-            rain_ds = filter_rain_rate(rain_ds)
+            rain_max = get_max_min(rain_ds,'rain_rate')[1]
+            rain_ds = filter_rain_rate(rain_ds,0.1,rain_max)
         
         #generate y_true on the current threshold for the rain rate
         y_true = np.where(rain_ds['rain_rate']>= rain_threshold, 1, 0)

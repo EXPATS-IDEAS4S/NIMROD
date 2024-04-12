@@ -260,7 +260,7 @@ def plot_distributions_by_elevation_classes(rain_rate_ds, msg_ds, elev_ds, path_
     plt.close(fig)
 
 
-def plot_ets_trend(path_out, vis_channels, elev_class):
+def plot_ets_trend_rain_threshold(path_out, vis_channels, elev_class):
     # Load the CSV file
     df = pd.read_csv(path_out+"ets_results_"+elev_class+".csv")
 
@@ -304,7 +304,7 @@ def plot_ets_trend(path_out, vis_channels, elev_class):
                     plt.Line2D([0], [0], color=colors[2], lw=4, label=str(rain_thresholds[2])+' mm/h')]
 
     # Place the legend on the 12th subplot's axes
-    axs[-1].legend(handles=legend_elements, loc='center')
+    axs[-1].legend(handles=legend_elements, loc='center', title="Rain Thresholds")
 
 
     # Adjust layout and save the plot
@@ -315,29 +315,25 @@ def plot_ets_trend(path_out, vis_channels, elev_class):
     plt.close(fig)
 
 
-def plot_ets_trend_elev_class(path_out, vis_channels, rain_threshold):
-    # Load the CSV files
-    df = pd.read_csv(path_out+"ets_results_"+elev_class+".csv")
+def plot_ets_trend_elev_class(path_out,channels, vis_channels, rain_threshold, elev_classes):
 
     # Set up the subplot grid
     fig, axs = plt.subplots(nrows=3, ncols=4, figsize=(18, 10))
     axs = axs.flatten()
 
-    # Get unique channels and rain threshold
-    channels = df['Channel'].unique()
-    rain_thresholds = df['Rain_Threshold'].unique()
-
     # Use a qualitative colormap
     cmap = plt.get_cmap('Dark2')
 
     # Generate diverse colors
-    colors = [cmap(i) for i in range(len(rain_thresholds))]
+    colors = [cmap(i) for i in range(len(elev_classes))]
 
     # Loop through the channels and plot
     for i, channel in enumerate(channels):
         unit = 'Reflectance (%)' if channel in vis_channels else 'Brightness Temp (K)'
-        for j, rain_th in enumerate(rain_thresholds):
-            channel_data = df[(df['Channel'] == channel) & (df['Rain_Threshold'] == rain_th)]
+        for j, el_clas in enumerate(elev_classes):
+            # Load the CSV files
+            df = pd.read_csv(path_out+"ets_results_"+el_clas+".csv")
+            channel_data = df[(df['Channel'] == channel) & (df['Rain_Threshold'] == rain_threshold)]
             axs[i].plot(channel_data['MSG_Threshold'], channel_data['ETS'], marker='.', linestyle='-', color=colors[j])#, label=str(rain_th))
         axs[i].set_title(channel)
         axs[i].set_xlabel(f'Channel Threshold in {unit}')
@@ -354,23 +350,23 @@ def plot_ets_trend_elev_class(path_out, vis_channels, rain_threshold):
     axs[-1].axis('off')
 
     # Create a custom legend for the whole figure
-    legend_elements = [plt.Line2D([0], [0], color=colors[0], lw=4, label=str(rain_thresholds[0])+' mm/h'),
-                    plt.Line2D([0], [0], color=colors[1], lw=4, label=str(rain_thresholds[1])+' mm/h'),
-                    plt.Line2D([0], [0], color=colors[2], lw=4, label=str(rain_thresholds[2])+' mm/h')]
+    legend_elements = [plt.Line2D([0], [0], color=colors[0], lw=4, label=str(elev_classes[0])+' 0-200 m'),
+                    plt.Line2D([0], [0], color=colors[1], lw=4, label=str(elev_classes[1])+' 200-600 m'),
+                    plt.Line2D([0], [0], color=colors[2], lw=4, label=str(elev_classes[2])+' 600+ m')]
 
     # Place the legend on the 12th subplot's axes
-    axs[-1].legend(handles=legend_elements, loc='center')
+    axs[-1].legend(handles=legend_elements, loc='center', title="Elevation Classes")
 
 
     # Adjust layout and save the plot
-    fig.suptitle("ETS trend - "+elev_class, fontsize=12, fontweight='bold', y=0.98)
+    fig.suptitle("ETS trend - "+str(rain_threshold), fontsize=12, fontweight='bold', y=0.98)
     plt.subplots_adjust(hspace=0.3, wspace=0.4)
     plt.tight_layout()
-    fig.savefig(path_out + 'ets_trends_by_rain_class_'+elev_class+'.png', bbox_inches='tight')
+    fig.savefig(path_out + 'ets_trends_by_elev_class_'+str(rain_threshold)+'.png', bbox_inches='tight')
     plt.close(fig)
 
 
-def plot_spatial_percentile(msg_ds,rain_ds, percentiles, vis_channels, ir_channels, extent, path_out):
+def plot_spatial_percentile(msg_ds,rain_ds, elevation_ds, percentiles, vis_channels, ir_channels, extent, path_out):
     """
     Plot the specified percentile of spatial data over time on a geographical map.
 
@@ -393,6 +389,10 @@ def plot_spatial_percentile(msg_ds,rain_ds, percentiles, vis_channels, ir_channe
     ds_rain_rechunked = rain_ds.chunk({'time': -1})
     rain_rate = ds_rain_rechunked['rain_rate'].quantile(percentiles[1]/100.0, dim='time', method='linear').values.squeeze()
 
+    # set up elevation
+    elevation = elevation_ds['orography'].values  
+    el_min, el_max = get_max_min(elevation_ds, 'orography')
+    contour_levels = np.linspace(el_min, el_max, num=10)  # Adjust number of levels as needed
 
     #set up plot 
     cmap = plt.cm.gist_ncar.copy()
@@ -402,6 +402,7 @@ def plot_spatial_percentile(msg_ds,rain_ds, percentiles, vis_channels, ir_channe
     norm = colors.Normalize(vmin=vmin, vmax=vmax)
     axs[0].contourf(lon_grid, lat_grid, rain_rate, cmap=cmap, norm=norm, transform=ccrs.PlateCarree())#, extend='max', alpha=0.4, levels=np.linspace(0, 100, 500))
     set_map_plot(axs[0],norm,cmap,extent,'Percentile '+str(percentiles[1])+' - Rain Rate','Rain Rate (mm/h)')
+    axs[0].contour(lons, lats, elevation, levels=contour_levels, colors='k', linewidths=0.5, alpha=0.5, transform=ccrs.PlateCarree())
 
     #get channels value
     for i, ch in enumerate(channels):
@@ -421,6 +422,8 @@ def plot_spatial_percentile(msg_ds,rain_ds, percentiles, vis_channels, ir_channe
         axs[i+1].contourf(lons, lats, ch_values, norm=norm, transform=ccrs.PlateCarree(), cmap=cmap)
         axs[i+1].set_facecolor('#dcdcdc')
 
+        axs[i+1].contour(lons, lats, elevation, levels=contour_levels, colors='k', linewidths=0.5, alpha=0.5, transform=ccrs.PlateCarree())
+
     # Adjust layout
     fig.suptitle("MSG and Rain Rate Data Percentiles", fontsize=12, fontweight='bold', y=0.98)
     plt.subplots_adjust(hspace=0.3, wspace=0.4)  
@@ -428,6 +431,10 @@ def plot_spatial_percentile(msg_ds,rain_ds, percentiles, vis_channels, ir_channe
     #plt.show()
     fig.savefig(path_out+'multichannels_map_percentiles_'+str(percentiles)+'.png', bbox_inches='tight')#, transparent=True)
     plt.close()
+
+
+
+    
 
 
 

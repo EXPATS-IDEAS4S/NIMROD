@@ -13,16 +13,16 @@ from process.config_process import lat_max, lon_max, lat_min, lon_min
 from process.config_process import reg_lats, reg_lons
 
 #path for images
-path_fig = "/work/case_studies_expats/Germany_Flood_2021/Fig/"
+path_fig = "/work/dcorradi/case_studies_expats/Germany_Flood_2021/Fig/"
 
 #get filenames for all cma
-path_cma = "/work/case_studies_expats/Germany_Flood_2021/data/cloud_products/CMA_NWCSAF/"
+path_cma = "/work/dcorradi/case_studies_expats/Germany_Flood_2021/data/cloud_products/CMA_NWCSAF/"
 cma_filepattern = 'S_NWC_CMA_MSG4_FLOOD-GER-2021-VISIR_*.nc'
 fnames_cma = sorted(glob(path_cma+cma_filepattern))
 output_folder = path_cma+'Processed/'
 
 #get filenames for all msg parallac corrected  files
-path_msg = "/work/case_studies_expats/Germany_Flood_2021/data/MSG/MSGNATIVE/Parallax_Corrected/"
+path_msg = "/work/dcorradi/case_studies_expats/Germany_Flood_2021/data/MSG/MSGNATIVE/Parallax_Corrected/"
 msg_filepattern = "MSG4-SEVI-MSG15-0100-NA-*.nc"
 fnames_msg = sorted(glob(path_msg+msg_filepattern))
 

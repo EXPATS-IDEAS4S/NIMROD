@@ -56,7 +56,7 @@ def set_map_plot(ax, norm, cmap, extent, plot_title, label, colorbar=True):
 
     #set axis thick labels
     gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True,
-                    linewidth=0.75, color='yellow', alpha=0.6, linestyle='--')
+                    linewidth=0.75, color='gray', alpha=0.6, linestyle='--')
     gl.top_labels = False
     gl.right_labels = False
     gl.xlines = True
@@ -113,3 +113,45 @@ def plot_cma(data, lat, lon, time, title, extent, save=None):
         fig.savefig(plot_filename, dpi=300, bbox_inches='tight')
         print(f"Plot saved as {plot_filename}")
         plt.close()
+
+
+def plot_cot(data, lat, lon, time, title, extent, cmap, norm, save=None):
+    """
+    Plots COT.
+    Adds geographical features for context, and optionally saves the plot to a file.
+
+    Parameters:
+    - data (numpy.ndarray): 2D array of cloud mask data (0 for clear, 1 for cloudy).
+    - lat (numpy.ndarray): 2D array of latitude values.
+    - lon (numpy.ndarray): 2D array of longitude values.
+    - time (datetime or str): Time corresponding to the data snapshot.
+    - title (str): Title for the plot.
+    - extent (list): Geographical extent [west, east, south, north] for the plot.
+    - save (str, optional): Path to save the plot image. If None, the plot is not saved.
+    """
+    fig, ax = plt.subplots(figsize=(10, 8), subplot_kw={'projection': ccrs.PlateCarree()})
+    #ax.set_extent(extent, crs=ccrs.PlateCarree())
+
+    # Plot the cloud mask data
+    mesh = ax.pcolormesh(lon, lat, data, cmap=cmap, norm=norm, transform=ccrs.PlateCarree())
+
+    set_map_plot(ax,norm,cmap,extent,title+': '+str(time),'',True)
+
+    # Save the plot
+    if save:
+        date_string = str(time)#.strftime('%Y-%m-%d %H:%M')
+        plot_filename = save+title+'_'+date_string.replace(' ','_')+'.png'
+        fig.savefig(plot_filename, dpi=300, bbox_inches='tight')
+        print(f"Plot saved as {plot_filename}")
+        plt.close()
+
+
+def savefile(fig,plot_filename):
+    fig.savefig(plot_filename, dpi=300, bbox_inches='tight')
+    print(f"Plot saved as {plot_filename}")
+    plt.close()
+
+
+
+
+

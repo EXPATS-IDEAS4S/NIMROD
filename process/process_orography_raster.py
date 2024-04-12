@@ -27,6 +27,8 @@ orography_path = "/work/dcorradi/orography_flood2021_high_res.nc" #"/net/ostro/f
 
 path_outputs = '/work/dcorradi/'
 
+#lonmin,lonmax,latmin,latmax = 5.,   16.,    42.,   51.5
+
 def main():
     
     # read first dataset 
