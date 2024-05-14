@@ -2,10 +2,10 @@
 #!/bin/bash
 
 # Path to the .tar.gz file
-TAR_GZ_FILE="/home/daniele/Documenti/PhD_Cologne/Case_Studies/Germany_Flood_2021/rain_products/nimrod/metoffice-c-band-rain-radar_europe_20210712_5km-composite.dat.gz.tar"
+TAR_GZ_FILE="/data/sat/msg/radar/nimrod/2023/metoffice-c-band-rain-radar_europe_20231231_5km-composite.dat.gz.tar"
 
 # Destination directory for extracted files
-DEST_DIR="/home/daniele/Documenti/PhD_Cologne/Case_Studies/Germany_Flood_2021/rain_products/nimrod/20210712_dat_pr/"
+DEST_DIR="/data/sat/msg/radar/nimrod/netcdf/2023/"
 
 # Create destination directory if it doesn't exist
 mkdir -p "$DEST_DIR"

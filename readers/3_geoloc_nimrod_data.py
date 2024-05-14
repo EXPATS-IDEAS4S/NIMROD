@@ -16,13 +16,13 @@ import matplotlib.colors as mcolors
 import pyproj
 
 #plot
-plot = True
+plot = False
 
 # Directory containing ASCII files and NC file
-ascii_dir = '/home/daniele/Documenti/PhD_Cologne/Case_Studies/Germany_Flood_2021/rain_products/nimrod/20210713_asc/'
+ascii_dir = '/data/sat/msg/radar/nimrod/asc/'
 
 # Folder to save the NetCDF file
-output_folder = '/home/daniele/Documenti/PhD_Cologne/Case_Studies/Germany_Flood_2021/rain_products/nimrod/'
+output_folder = '/data/sat/msg/radar/nimrod/netcdf/2023/04/'
 
 # Ensure the output folder exists, create if not
 if not os.path.exists(output_folder):
@@ -172,7 +172,7 @@ for i, time in enumerate(times):
     date_str = time.strftime('%Y%m%d_%H%M')
 
     # Create a unique filename for each time step
-    netcdf_filename = f'{output_folder}/nc_files/nimrod_rain_data_eu_{date_str}.nc'
+    netcdf_filename = f'{output_folder}nimrod_rain_data_eu_{date_str}.nc'
 
     with Dataset(netcdf_filename, 'w', format='NETCDF4') as nc:
         # Create dimensions

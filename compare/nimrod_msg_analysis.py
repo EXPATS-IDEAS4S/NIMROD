@@ -24,15 +24,20 @@ sys.path.append('/home/dcorradi/Documents/Codes/NIMROD/')
 from figures.quality_check_functions import plot_msg_channels_and_rain_rate, create_gif_from_folder, plot_distributions, plot_distr_rain, plot_channel_daily_trends, plot_single_temp_trend, plot_channel_trends
 from figures.plot_comparison_function import plot_rain_rate_vs_msg_channels, plot_distributions_by_rain_classes, plot_ets_trend_rain_threshold, plot_spatial_percentile, plot_spatial_metrics, plot_ets_trend_elev_class
 
-plot_ets_trend_rain_threshold(path_outputs,vis_channels,'whole_distribution')
-
-"""
+#Domain
+case_domain = [lonmin, lonmax, latmin, latmax]
 
 # List all rain product files in the folder and sort them alphabetically
 fnames_rain = sorted(glob(rain_path+rain_filepattern))
 
-#list of all MSG data
-fnames_msg = sorted(glob(msg_folder+msg_filepattern))
+combination = True
+#list of MSG data
+if combination:
+    fnames_msg = sorted(glob(msg_folder+'combination/'+msg_filepattern))
+    time_dim_name = 'time'
+else:
+    fnames_msg = sorted(glob(msg_folder+msg_filepattern))
+    time_dim_name = 'end_time'
 
 # List of all CMA data
 fnames_cma = sorted(glob(cma_path+cma_filepattern))
@@ -52,11 +57,11 @@ else:
 #print(fnames_msg_day)    
 
 # Open the NetCDF files as a single dataset, concatenating along 'end_time'
-ds_msg = xr.open_mfdataset(fnames_msg, combine='nested', concat_dim='end_time', parallel=True)
+ds_msg = xr.open_mfdataset(fnames_msg, combine='nested', concat_dim=time_dim_name, parallel=True)
 #ds_msg_day = xr.open_mfdataset(fnames_msg_day, combine='nested', concat_dim='end_time', parallel=True)
 print('\nDataset MSG\n',ds_msg)
 #print('\nDataset MSG dattime\n:',ds_msg_day)
-ds_msg = ds_msg.rename({'end_time':'time'})
+ds_msg = ds_msg.rename({time_dim_name:'time'})
 #ds_msg_day = ds_msg_day.rename({'end_time':'time'})
 
 #TODO apply day mask using SZA
@@ -100,14 +105,14 @@ for ch in channels:
     min_values.append(min)
     max_values.append(max)
 
-#loop trough the files to plot single time maps
+#loop trough the files to plot single time maps with delineated rainy areas
 for t in range(n_times):
     rain_ds = xr.open_dataset(fnames_rain[t])
     msg_ds = xr.open_dataset(fnames_msg[t])
     msg_ds = mask_nighttime_single_step(msg_ds,'end_time',vis_channels,'04','17') 
     for rain_th in rain_class_thresholds:
         print('\nrain th\n', rain_th)
-        plot_msg_channels_and_rain_rate(rain_ds, msg_ds, ds_oro, path_outputs+"ets_results_whole_distribution.csv", path_outputs+'maps_thresholds/rain_'+str(rain_th)+'/',[lonmin, lonmax, latmin, latmax], vis_channels, ir_channels, min_values, max_values, rain_th, True)
+        plot_msg_channels_and_rain_rate(rain_ds, msg_ds, ds_oro, path_outputs+"ets_results_whole_distribution.csv", path_outputs+'maps_thresholds/rain_'+str(rain_th)+'/',case_domain, vis_channels, ir_channels, min_values, max_values, rain_th, True)
     #exit()
 
 #create gif
@@ -179,6 +184,8 @@ print('Rain classes:','\n', classes,'\n', rain_class_names)
 
 #calc_distribution_stats_by_rain_classes(ds_rain,cloudy_msg_ds,path_outputs,channels,classes,rain_class_names)
 
+plot_ets_trend_rain_threshold(path_outputs,vis_channels,'whole_distribution')
+
 # for i, elev_class_name in enumerate(elevation_class_names):
 #     if elev_class_name!='Plains':
 #         print(elev_class_name,el_classes[i])
@@ -208,4 +215,3 @@ for rain_threshold in rain_class_thresholds:
         for metric in metrics:
             print('metric: ',metric)
             plot_spatial_metrics(ds_metrics,ds_rain,metric,rain_threshold,vis_channels, ir_channels,[lonmin, lonmax, latmin, latmax],path_outputs )
-"""

@@ -156,8 +156,8 @@ def show_radar_image(full_filepath):
 ########  
 
 #directories paths
-fpath = '/home/daniele/Documenti/PhD_Cologne/Case_Studies/Germany_Flood_2021/rain_products/nimrod/20210713_dat/'
-save_dir = '/home/daniele/Documenti/PhD_Cologne/Case_Studies/Germany_Flood_2021/rain_products/nimrod/20210713_asc/'
+fpath = '/data/sat/msg/radar/nimrod/dat/2023/04/'
+save_dir = '/data/sat/msg/radar/nimrod/asc/'
 
 # Ensure the output folder exists, create if not
 if not os.path.exists(save_dir):

@@ -25,8 +25,12 @@ extent = [lon_min, lon_max, lat_min, lat_max] #[left, right, bottom ,top]
 
 # Read MSG lat/lon data
 if regular_grid:
-    lat_points = np.load(reg_lats)
-    lon_points = np.load(reg_lons)
+    fnames_msg = glob(msg_folder+msg_filepattern)
+    ds_msg = xr.open_dataset(fnames_msg[0])
+    lat_points = ds_msg['lat'].values
+    lon_points = ds_msg['lon'].values
+    #lat_points = np.load(reg_lats)
+    #lon_points = np.load(reg_lons)
     msg_lat_grid, msg_lon_grid = np.meshgrid(lat_points,lon_points,indexing='ij')
 else:  
     fnames_msg = glob(msg_folder+msg_filepattern)  
@@ -50,7 +54,7 @@ radar_lat_grid = radar_lat.reshape(nrows_radar, ncols_radar)
 #check_grid(radar_lat_grid,radar_lon_grid,rain_rate_grid,'radar grid')
 
 #check with a plot before and after the crop
-plot_rain_data(rain_rate_grid,radar_lat_grid,radar_lon_grid, time, 'original_grid', extent, fig_folder)
+#plot_rain_data(rain_rate_grid,radar_lat_grid,radar_lon_grid, time, 'original_grid', extent, fig_folder)
 
 # #define area of work for the project for cropping the data 
 # cropped_data, cropped_lat, cropped_lon = crop_radar_data(rain_rate_grid, radar_lat_grid, radar_lon_grid, lat_min, lat_max, lon_min, lon_max)
@@ -73,7 +77,7 @@ for radar_file in radar_files:
     #check_grid(msg_lat_grid,msg_lon_grid,regridded_data,'radar regrid')
 
     #plot the regrid
-    plot_rain_data(regridded_data, msg_lat_grid, msg_lon_grid, time, 'regridded', extent, fig_folder)
+    #plot_rain_data(regridded_data, msg_lat_grid, msg_lon_grid, time, 'regridded', extent, fig_folder)
     #exit()
 
     if save:
@@ -108,7 +112,7 @@ for radar_file in radar_files:
              os.makedirs(output_folder)
 
         # Define a new filename for saving regridded data
-        save_filename = os.path.join(output_folder, 'regridded_' + os.path.basename(radar_file))
+        save_filename = os.path.join(output_folder, os.path.basename(radar_file))
 
         # Save in netCDF format
         ds.to_netcdf(save_filename)
