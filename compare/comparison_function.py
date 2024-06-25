@@ -39,8 +39,12 @@ def get_max_min(ds, ch):
     ch_values = ds[ch][:]
     ch_values = ch_values.values.flatten()
     ch_values = ch_values[~np.isnan(ch_values)]
-    max = np.amax(ch_values)
-    min = np.amin(ch_values)
+    if len(ch_values)>0:
+        max = np.amax(ch_values)
+        min = np.amin(ch_values)
+    else:
+        max = np.nan
+        min = np.nan
 
     return min, max
 

@@ -14,7 +14,7 @@ import datetime
 import pandas as pd
 
 from config_compare import msg_folder, msg_filepattern, rain_path, rain_filepattern, path_outputs, cma_path, cma_filepattern
-from config_compare import channels, vis_channels, ir_channels, lonmin,lonmax,latmin,latmax
+from config_compare import channels, vis_channels, ir_channels, lonmin,lonmax,latmin,latmax, channel_comb
 from config_compare import rain_class_thresholds, rain_class_names, path_orography, elevation_class_thresholds, elevation_class_names
 
 from comparison_function import get_max_min, select_daytime_files_from_hour, mask_nighttime_values, filter_rain_rate, filter_by_cloud_mask, filter_elevation, mask_nighttime_single_step, find_max_ets_threshold
@@ -35,6 +35,7 @@ combination = True
 if combination:
     fnames_msg = sorted(glob(msg_folder+'combination/'+msg_filepattern))
     time_dim_name = 'time'
+    channels = channel_comb
 else:
     fnames_msg = sorted(glob(msg_folder+msg_filepattern))
     time_dim_name = 'end_time'
@@ -65,7 +66,10 @@ ds_msg = ds_msg.rename({time_dim_name:'time'})
 #ds_msg_day = ds_msg_day.rename({'end_time':'time'})
 
 #TODO apply day mask using SZA
-ds_msg_daytime_mask = mask_nighttime_values(ds_msg,'time', vis_channels,'04','17')
+if combination:
+    ds_msg_daytime_mask = mask_nighttime_values(ds_msg,'time', ['VIS006:IR_016'] ,'04','17') #COT should be already be masked
+else: 
+    ds_msg_daytime_mask = mask_nighttime_values(ds_msg,'time', vis_channels,'04','17')
 print('\nDataset MSG masked\n',ds_msg_daytime_mask)
 
 # Open the NetCDF files as a single dataset, concatenating along 'end_time'
@@ -112,7 +116,7 @@ for t in range(n_times):
     msg_ds = mask_nighttime_single_step(msg_ds,'end_time',vis_channels,'04','17') 
     for rain_th in rain_class_thresholds:
         print('\nrain th\n', rain_th)
-        plot_msg_channels_and_rain_rate(rain_ds, msg_ds, ds_oro, path_outputs+"ets_results_whole_distribution.csv", path_outputs+'maps_thresholds/rain_'+str(rain_th)+'/',case_domain, vis_channels, ir_channels, min_values, max_values, rain_th, True)
+        plot_msg_channels_and_rain_rate(rain_ds, msg_ds, ds_oro, 'None', path_outputs+'nimrod_channel_comb/maps/',case_domain, vis_channels, ir_channels, min_values, max_values, rain_th, True)
     #exit()
 
 #create gif

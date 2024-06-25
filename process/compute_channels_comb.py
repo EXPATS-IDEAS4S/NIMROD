@@ -17,13 +17,13 @@ import os
 from glob import glob
 
 sys.path.append('/home/dcorradi/Documents/Codes/NIMROD/')
-from compare.config_compare import msg_folder, msg_filepattern, channels
+from compare.config_compare import msg_folder, msg_filepattern
 
 # List of all MSG data files
 fnames_msg = sorted(glob(msg_folder + msg_filepattern))
 
 #open cot data
-path_cot = "/work/dcorradi/case_studies_expats/Germany_Flood_2021/data/cloud_products/CPP_CMSAF/Processed/"
+path_cot = "/net/yube/dcorradi/case_studies_expats/Germany_Flood_2021/data/cloud_products/CPP_CMSAF/Processed/"
 cot_filepattern = 'CPPin*405SVMSGI1UD.nc'
 
 fnames_cot = sorted(glob(path_cot+cot_filepattern))
@@ -44,10 +44,14 @@ for t in range(n_times):
 
     #open cot dataset
     cot_ds = xr.open_dataset(fnames_cot[t])
+    #print(cot_ds['ot'].values)
     #print(cot_ds)
 
+    #transform cot in a datarray and save it in the main dataset
+    cot_da = xr.DataArray(cot_ds['ot'].values, dims=("time","y","x"), name='COT')
+
     # Calculate combinations and add them to the new dataset
-    combinations_ds['COT'] = cot_ds['ot']
+    combinations_ds['COT'] = cot_da
     combinations_ds['VIS006:IR_016'] = msg_ds['VIS006'] / msg_ds['IR_016']
     combinations_ds['WV_062-IR_108'] = msg_ds['WV_062'] - msg_ds['IR_108']
     combinations_ds['IR_087-IR_108'] = msg_ds['IR_087'] - msg_ds['IR_108']
@@ -55,6 +59,7 @@ for t in range(n_times):
     combinations_ds['IR_039-IR_108'] = msg_ds['IR_039'] - msg_ds['IR_108']
     combinations_ds['IR_039-WV_073'] = msg_ds['IR_039'] - msg_ds['WV_073']
     combinations_ds['WV_073-IR_120'] = msg_ds['WV_073'] - msg_ds['IR_120']
+    print(combinations_ds.COT.values)
 
     # Define the new path and filename
     new_path = os.path.join(msg_folder, 'combination')
