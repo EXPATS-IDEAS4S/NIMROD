@@ -36,8 +36,8 @@ def get_max_min(ds, ch):
         The maximum value found in the channel, excluding NaN values.
     """
 
-    ch_values = ds[ch][:]
-    ch_values = ch_values.values.flatten()
+    ch_values = ds[ch].values
+    ch_values = ch_values.flatten()
     ch_values = ch_values[~np.isnan(ch_values)]
     if len(ch_values)>0:
         max = np.amax(ch_values)
