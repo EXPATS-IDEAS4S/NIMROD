@@ -23,7 +23,7 @@ from comparison_function import generate_cloud_classes, calc_distribution_stats_
 sys.path.append('/home/dcorradi/Documents/Codes/NIMROD/')
 from figures.quality_check_functions import plot_msg_channels_and_rain_rate, create_gif_from_folder, plot_distributions, plot_distr_rain, plot_channel_daily_trends, plot_single_temp_trend, plot_channel_trends
 from figures.plot_comparison_function import plot_rain_rate_vs_msg_channels, plot_distributions_by_rain_classes, plot_ets_trend_rain_threshold, plot_spatial_percentile, plot_spatial_metrics, plot_ets_trend_elev_class
-from figures.msg_comb_plot_func import plot_msg_channels_comb, plot_distributions_comb, plot_channel_daily_trends_comb, plot_spatial_percentile_comb, plot_distributions_by_rain_classes_comb, filter_dataset_by_variable, save_ets_thresholds_channels_trends_comb, plot_ets_trend_rain_threshold_comb, save_metrics_thresholds_channels_comb, plot_conf_matrix_maps, save_conf_matrix_values, merge_csv_files, calculate_metrics, calculate_and_plot_metrics_over_time
+from figures.msg_comb_plot_func import plot_msg_channels_comb, plot_distributions_comb, plot_channel_daily_trends_comb, plot_spatial_percentile_comb, plot_distributions_by_rain_classes_comb, filter_dataset_by_variable, save_ets_thresholds_channels_trends_comb, plot_ets_trend_rain_threshold_comb, save_metrics_thresholds_channels_comb, plot_conf_matrix_maps, save_conf_matrix_values, merge_csv_files, calculate_metrics, calculate_and_plot_metrics_over_time, save_conf_matrix_values_nc, plot_distributions_conf_matrix
 
 #Domain
 case_domain = [lonmin, lonmax, latmin, latmax]
@@ -50,23 +50,23 @@ else:
     exit()
  
 
-# # Open the NetCDF files as a single dataset, concatenating along 'end_time'
-# ds_msg_comb = xr.open_mfdataset(fnames_msg_comb, combine='nested', concat_dim='time', parallel=True)
-# ds_msg = xr.open_mfdataset(fnames_msg, combine='nested', concat_dim='end_time', parallel=True)
-# ds_msg = ds_msg.rename({'end_time':'time'})
-# ds_msg_merge_all = xr.merge([ds_msg,ds_msg_comb])
-# #ds_msg_day = xr.open_mfdataset(fnames_msg_day, combine='nested', concat_dim='end_time', parallel=True)
-# print('\nDataset MSG\n',ds_msg_merge_all.var)
-# #print('\nDataset MSG dattime\n:',ds_msg_day)
+# Open the NetCDF files as a single dataset, concatenating along 'end_time'
+ds_msg_comb = xr.open_mfdataset(fnames_msg_comb, combine='nested', concat_dim='time', parallel=True)
+ds_msg = xr.open_mfdataset(fnames_msg, combine='nested', concat_dim='end_time', parallel=True)
+ds_msg = ds_msg.rename({'end_time':'time'})
+ds_msg_merge_all = xr.merge([ds_msg,ds_msg_comb])
+#ds_msg_day = xr.open_mfdataset(fnames_msg_day, combine='nested', concat_dim='end_time', parallel=True)
+print('\nDataset MSG\n',ds_msg_merge_all.var)
+#print('\nDataset MSG dattime\n:',ds_msg_day)
 
 #TODO apply day mask using SZA
-#ds_msg_daytime_mask = mask_nighttime_values(ds_msg,'time', ['VIS006:IR_016'] ,'04','17') #COT should be already be masked
+ds_msg_daytime_mask = mask_nighttime_values(ds_msg_merge_all,'time', ['VIS006:IR_016','VIS006', 'VIS008','IR_016'] ,'04','17') #COT should be already be masked
 
-#print('\nDataset MSG masked\n',ds_msg_daytime_mask)
+print('\nDataset MSG masked\n',ds_msg_daytime_mask)
 
-# # Open the NetCDF files as a single dataset, concatenating along 'end_time'
-# ds_rain = xr.open_mfdataset(fnames_rain, combine='nested', concat_dim='time', parallel=True)
-# print('\nDataset rain\n',ds_rain)
+# Open the NetCDF files as a single dataset, concatenating along 'end_time'
+ds_rain = xr.open_mfdataset(fnames_rain, combine='nested', concat_dim='time', parallel=True)
+print('\nDataset rain\n',ds_rain)
 
 # # Open CMA Dataset concateneting along time dimension
 # ds_cma = xr.open_mfdataset(fnames_cma, combine='nested', concat_dim='time', parallel=True)
@@ -75,15 +75,16 @@ else:
 #Open Orography Dataset
 ds_oro = xr.open_dataset(path_orography)
 print('\n Dataset Orography\n', ds_oro)
+print(ds_oro['orography'].values)
 
 # Define elevation classes
-elev_min, elev_max = get_max_min(ds_oro,'orography')
-print(elev_min,elev_max)
-print(elevation_class_thresholds) 
-# Correctly constructing the list of boundaries
-boundaries = [elev_min] + elevation_class_thresholds + [elev_max]
-el_classes = generate_cloud_classes(boundaries)
-print(el_classes, elevation_class_names)
+# elev_min, elev_max = get_max_min(ds_oro,'orography')
+# print(elev_min,elev_max)
+# print(elevation_class_thresholds) 
+# # Correctly constructing the list of boundaries
+# boundaries = [elev_min] + elevation_class_thresholds + [elev_max]
+# el_classes = generate_cloud_classes(boundaries)
+# print(el_classes, elevation_class_names)
 
 # # Define Rain classes
 # rain_min, rain_max = get_max_min(ds_rain,'rain_rate')
@@ -103,8 +104,8 @@ channels_to_plot = ['COT','WV_062','IR_108','WV_062-IR_108']
 cmaps_to_plot = ['viridis','cool','cool','cool']
 units_to_plot = ['','K','K','K']
 trends_to_plot = ['positive','negative','negative','positive']
-min_values =[0,200,200,-60]
-max_values=[150,300,300,0]
+min_values =[0,210,210,-65]
+max_values=[150,250,300,10]
 msg_thresholds = [15.7894736842105, 230.952929045025 , 252.283447265625 ,-20.7063831530119 ]
 
 # #get max min values in each channel
@@ -116,9 +117,23 @@ msg_thresholds = [15.7894736842105, 230.952929045025 , 252.283447265625 ,-20.706
 #     max_values.append(max)
 # print(min_values,max_values)
 
+#open confusion matrix merged values
+conf_path = '/net/yube/dcorradi/case_studies_expats/Germany_Flood_2021/Fig/nimrod_msg_analysis/nimrod_channel_comb/nc_files/'
+conf_filepattern = 'confusion_matrix_results_*.nc'
+fnames_conf = sorted(glob(conf_path+conf_filepattern))
+ds_conf = xr.open_mfdataset(fnames_conf, combine='nested', concat_dim='time', parallel=True)
+print('\n Dataset Confusion Matrix\n', ds_conf)
 
-#loop trough the files to plot single time maps with delineated rainy areas
-#for i, ch in enumerate(channels_to_plot):
+for i, ch in enumerate(channels_to_plot):
+    print(f'channel {ch}')
+    if ch!='COT':
+        unit = 'Brightness Temperature ' + units_to_plot[i]
+    else:
+        unit = units_to_plot[i]
+    plot_distributions_conf_matrix(ds_msg_daytime_mask, ds_rain, ds_oro, ds_conf, ch, unit, min_values[i], max_values[i], path_outputs+'nimrod_channel_comb/conf_matrix_distr_ch'+ch+'.png')
+
+# #loop trough the files to plot single time maps with delineated rainy areas
+# #for i, ch in enumerate(channels_to_plot):
 # for t in range(n_times):
 #     #print(ch)
 #     rain_ds = xr.open_dataset(fnames_rain[t])
@@ -130,12 +145,14 @@ msg_thresholds = [15.7894736842105, 230.952929045025 , 252.283447265625 ,-20.706
 #     combined_msg_ds = xr.merge([msg_ds, msg_comb_ds])
 #     #plot_conf_matrix_spatial_maps(combined_msg_ds, rain_ds, ds_oro, 0.1, msg_thresholds[i], trends_to_plot[i], path_outputs+'nimrod_channel_comb/', case_domain, ch, cmaps_to_plot[i], units_to_plot[i], min_values[i], max_values[i])
 #     #plot_conf_matrix_maps(combined_msg_ds, rain_ds, ds_oro, 0.1, msg_thresholds, trends_to_plot, path_outputs+'nimrod_channel_comb/', case_domain, channels_to_plot)
-#     save_conf_matrix_values(combined_msg_ds, rain_ds,  ds_oro, 0.1, msg_thresholds, channels_to_plot, trends_to_plot, el_classes, elevation_class_names, path_outputs+'nimrod_channel_comb/csv_files/')
+#     #save_conf_matrix_values(combined_msg_ds, rain_ds,  ds_oro, 0.1, msg_thresholds, channels_to_plot, trends_to_plot, el_classes, elevation_class_names, path_outputs+'nimrod_channel_comb/csv_files/')
+#     save_conf_matrix_values_nc(combined_msg_ds, rain_ds, 0.1, msg_thresholds, channels_to_plot, trends_to_plot, path_outputs+'nimrod_channel_comb/nc_files/')
 #     #exit()
 
 #merge_csv_files(path_outputs+'nimrod_channel_comb/csv_files/', path_outputs+'nimrod_channel_comb/merged_file.csv')
 #calculate_metrics(path_outputs+'nimrod_channel_comb/merged_file.csv', path_outputs+'nimrod_channel_comb/output_metrics.csv')
-calculate_and_plot_metrics_over_time(path_outputs+'nimrod_channel_comb/merged_file.csv', path_outputs+'nimrod_channel_comb/metrics_temp_trend_plot.png')
+#for i, ch in enumerate(channels_to_plot):
+#    calculate_and_plot_metrics_over_time(path_outputs+'nimrod_channel_comb/merged_file.csv',ch, path_outputs+'nimrod_channel_comb/metrics_temp_trend_plot_'+ch+'.png')
 #create gif
 #create_gif_from_folder( path_outputs+'nimrod_channel_comb/conf_matrix_maps/',path_outputs+'nimrod_channel_comb/'+ 'conf_matrix_Germany_2021_floods.gif')
 

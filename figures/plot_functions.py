@@ -73,6 +73,26 @@ def set_map_plot(ax, norm, cmap, extent, plot_title, label, colorbar=True):
     ax.set_title(plot_title, fontsize=12, fontweight='bold')
 
 
+def set_map_plot_nocolorbar(ax, extent, plot_title):
+    #set axis thick labels
+    gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True,
+                    linewidth=0.75, color='gray', alpha=0.6, linestyle='--')
+    gl.top_labels = False
+    gl.right_labels = False
+    gl.xlines = True
+    gl.xformatter = LONGITUDE_FORMATTER
+    gl.yformatter = LATITUDE_FORMATTER
+    gl.xlabel_style = {'size': 10, 'color': 'black'}
+    gl.ylabel_style = {'size': 10, 'color': 'black'}
+
+    # Adds coastlines and borders to the current axes
+    ax.coastlines(resolution='50m', linewidths=0.5) 
+    ax.add_feature(cfeature.BORDERS, linewidth=0.5, edgecolor='black')
+    ax.set_extent(extent) #[left, right, bottom ,top]
+
+    ax.set_title(plot_title, fontsize=12, fontweight='bold')
+
+
 
 def plot_cma(data, lat, lon, time, title, extent, save=None):
     """
